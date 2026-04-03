@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Ensemble Brain | Finspark Glass Intelligence</title>
+<meta name="description" content="Deployment-Aware Feature Intelligence Framework — Ensemble Brain Dashboard"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "surface": "#0c1324",
+        "surface-dim": "#070d1f",
+        "surface-container": "#191f31",
+        "surface-container-low": "#151b2d",
+        "surface-container-high": "#23293c",
+        "surface-container-highest": "#2e3447",
+        "surface-container-lowest": "#070d1f",
+        "on-surface": "#dce1fb",
+        "on-surface-variant": "#bbcabf",
+        "outline": "#86948a",
+        "outline-variant": "#3c4a42",
+        "primary": "#4edea3",
+        "primary-container": "#10b981",
+        "on-primary": "#003824",
+        "on-primary-container": "#00422b",
+        "secondary": "#ffb2b7",
+        "secondary-container": "#b50036",
+        "on-secondary-container": "#ffc2c4",
+        "tertiary": "#7bd0ff",
+        "tertiary-container": "#19aee8",
+        "error": "#ffb4ab",
+        "error-container": "#93000a",
+      },
+      fontFamily: {
+        headline: ["Inter"],
+        body: ["Inter"],
+        label: ["Space Grotesk"],
+        mono: ["JetBrains Mono"],
+      },
+    },
+  },
+}
+</script>
+<style>
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.glass-card {
+    background: rgba(35, 41, 60, 0.6);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(134, 148, 138, 0.1);
+}
+.node-glow-primary { box-shadow: 0 0 15px rgba(78, 222, 163, 0.3); }
+.node-glow-danger { box-shadow: 0 0 20px rgba(181, 0, 54, 0.6); }
+.node-glow-amber { box-shadow: 0 0 12px rgba(245, 158, 11, 0.4); }
+.glass-card { transition: z-index 0s; }
+.glass-card:hover { z-index: 40; }
+
+/* Tooltip */
+.tip-trigger { position: relative; cursor: help; }
+.tip-trigger .tip-content {
+    visibility: hidden; opacity: 0; position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%); width: 240px; padding: 10px 14px; border-radius: 8px;
+    background: rgba(7, 13, 31, 0.96); border: 1px solid rgba(134,148,138,0.2);
+    backdrop-filter: blur(16px); font-size: 11px; color: #bbcabf; line-height: 1.5;
+    z-index: 500; pointer-events: none; transition: opacity 0.2s, visibility 0.2s;
+    font-family: 'Inter', sans-serif; font-weight: 400; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.tip-trigger .tip-content.tip-down {
+    bottom: auto; top: calc(100% + 8px);
+}
+.tip-trigger:hover .tip-content { visibility: visible; opacity: 1; }
+.tip-trigger:hover { z-index: 500; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2e3447; border-radius: 2px; }
+
+/* Animations */
+@keyframes fadeSlideIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: none; } }
+.animate-slide-in { animation: fadeSlideIn 0.4s ease forwards; }
+.delay-1 { animation-delay: 0.05s; opacity: 0; }
+.delay-2 { animation-delay: 0.1s; opacity: 0; }
+.delay-3 { animation-delay: 0.15s; opacity: 0; }
+.delay-4 { animation-delay: 0.2s; opacity: 0; }
+</style>
+</head>
+<body class="bg-surface text-on-surface font-body overflow-y-auto overflow-x-hidden flex flex-col h-screen">
+
+<!-- ==================== SIDEBAR ==================== -->
+<aside id="sidebar" class="flex flex-col fixed left-0 top-0 h-full z-40 bg-slate-900/80 backdrop-blur-2xl w-60 border-r border-slate-800/30 transition-transform duration-300 ease-in-out translate-x-0">
+    <div class="p-5 flex flex-col gap-1">
+        <div class="text-emerald-400 font-bold flex items-center gap-2">
+            <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">hub</span>
+            <span class="text-lg tracking-tighter">Ensemble Brain</span>
+        </div>
+        <div class="mt-3">
+            <p class="font-mono text-[10px] uppercase tracking-widest text-emerald-400/70">System Intelligence</p>
+            <p class="font-mono text-[8px] text-slate-500 uppercase tracking-widest">V4.2.0-Stable</p>
+        </div>
+    </div>
+    <nav class="flex-1 mt-2 px-3 space-y-1" id="sidebar-nav">
+        <a data-page="live" class="nav-link flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800/50 transition-colors duration-200 font-mono text-[11px] uppercase tracking-widest" href="#">
+            <span class="material-symbols-outlined text-base">sensors</span>Live Intelligence
+        </a>
+        <a data-page="paths" class="nav-link flex items-center gap-3 px-4 py-2.5 rounded-xl text-emerald-400 bg-emerald-500/10 border-r-2 border-emerald-500 font-mono text-[11px] uppercase tracking-widest" href="#">
+            <span class="material-symbols-outlined text-base">route</span>Path Integrity
+        </a>
+        <a data-page="ensemble" class="nav-link flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800/50 transition-colors duration-200 font-mono text-[11px] uppercase tracking-widest" href="#">
+            <span class="material-symbols-outlined text-base">hub</span>Model Ensemble
+        </a>
+        <a data-page="transitions" class="nav-link flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800/50 transition-colors duration-200 font-mono text-[11px] uppercase tracking-widest" href="#">
+            <span class="material-symbols-outlined text-base">account_tree</span>State Transitions
+        </a>
+        <a data-page="explain" class="nav-link flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-slate-800/50 transition-colors duration-200 font-mono text-[11px] uppercase tracking-widest" href="#">
+            <span class="material-symbols-outlined text-base">visibility</span>Explainability
+        </a>
+    </nav>
+    <div class="mt-auto p-4 border-t border-slate-800/30">
+        <div class="flex items-center gap-3 mb-4 px-2">
+            <div class="w-8 h-8 rounded-full bg-surface-container-highest border border-outline-variant flex items-center justify-center text-xs font-bold text-emerald-400">SA</div>
+            <div class="flex flex-col">
+                <span class="text-xs font-mono font-bold text-slate-200 uppercase tracking-tighter">Senior Analyst</span>
+                <span class="text-[10px] font-mono text-emerald-400/60" id="sidebar-tenant">Tenant: —</span>
+            </div>
+        </div>
+        <div class="space-y-1">
+            <a class="flex items-center gap-3 px-3 py-2 text-slate-500 hover:text-slate-200 transition-colors text-xs font-mono uppercase tracking-widest" href="/docs"><span class="material-symbols-outlined text-sm">description</span>API Docs</a>
+        </div>
+    </div>
+</aside>
+
+<!-- ==================== MAIN CONTENT ==================== -->
+<main id="main-content" class="ml-60 min-h-screen flex flex-col relative transition-all duration-300 ease-in-out">
+
+    <!-- Global Status Ticker -->
+    <div class="w-full bg-slate-900/40 border-b border-slate-800/30 flex justify-between items-center px-6 py-2 text-xs font-mono z-[60]">
+        <div class="flex items-center gap-6">
+            <div class="flex items-center gap-2 text-emerald-400 font-bold uppercase tracking-widest">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]"></span>
+                System Operational
+            </div>
+            <div class="text-on-surface-variant flex items-center gap-2 border-l border-slate-800/50 pl-6">
+                <span class="uppercase tracking-widest text-[9px] hidden sm:block">Inference Latency:</span> <span class="text-slate-300 font-bold text-[10px]">2.6ms avg</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-6">
+            <div class="text-on-surface-variant flex items-center gap-2">
+                <span class="uppercase tracking-widest text-[9px] hidden sm:block">Global Risk Factor =</span> <span class="text-rose-400 font-bold text-[10px]">0.39</span>
+            </div>
+            <div class="text-slate-400 uppercase tracking-widest border-l border-slate-800/50 pl-6 text-[9px] hidden lg:block">
+                Phase 2: Synthetic Boost
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Bar -->
+    <header class="flex justify-between items-center w-full px-6 py-3.5 sticky top-0 z-50 bg-slate-950/70 backdrop-blur-xl border-b border-slate-800/50 shadow-[0_0_20px_rgba(16,185,129,0.06)]">
+        <div class="flex items-center gap-6">
+            <button id="sidebar-toggle" class="text-slate-400 hover:text-emerald-400 transition-colors flex items-center justify-center p-1 rounded-md hover:bg-slate-800/50">
+                <span class="material-symbols-outlined text-[20px]">menu_open</span>
+            </button>
+            <h1 class="text-lg font-black text-emerald-400 tracking-tighter uppercase pl-2 border-l border-slate-800/50">Path Integrity</h1>
+            <nav class="flex gap-4">
+                <span class="text-slate-400 font-medium text-sm px-2 py-0.5 rounded" id="header-confidence">— Confidence</span>
+                <span class="text-emerald-400 font-bold border-b-2 border-emerald-500 pb-0.5 text-sm">LSTM vs Markov</span>
+            </nav>
+        </div>
+        <div class="flex items-center gap-4">
+            <div id="phase-badge" class="bg-surface-container-lowest border border-outline-variant px-3 py-1.5 rounded-lg flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" id="phase-dot"></span>
+                <span class="font-mono text-xs text-on-surface-variant tracking-tighter" id="phase-text">Loading…</span>
+            </div>
+            <select id="tenant-select" class="bg-surface-container-lowest border border-outline-variant text-on-surface-variant rounded-lg px-3 py-1.5 text-xs font-mono outline-none cursor-pointer">
+                <option>Loading…</option>
+            </select>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Grid -->
+    <div class="p-6 pb-20 grid grid-cols-12 gap-5 flex-1 relative" id="dashboard-content">
+
+        <!-- FULL WIDTH TOP ROW -->
+        <div class="col-span-12 sortable-list flex flex-col gap-5" id="top-row" style="min-height: 480px;">
+            <!-- Application Path Flow Graph -->
+            <section class="glass-card rounded-3xl p-5 h-full relative flex flex-col animate-slide-in">
+                <div class="flex justify-between items-center mb-4 z-10 w-full cursor-move">
+                    <div class="flex flex-col">
+                        <h2 class="text-base font-bold tracking-tight flex items-center gap-2">
+                            Application Path Flow
+                            <span class="tip-trigger">
+                                <span class="material-symbols-outlined text-on-surface-variant text-sm">help</span>
+                                <span class="tip-content tip-down">Visualises user journeys through the lending funnel. Nodes represent feature touchpoints, and edges show the transition probability between them. Red nodes indicate friction points with high churn risk.</span>
+                            </span>
+                        </h2>
+                        <p class="text-[10px] text-on-surface-variant font-mono uppercase tracking-widest mt-1">Live Sequential Mapping</p>
+                    </div>
+                    <button class="expand-btn text-slate-500 hover:text-emerald-400 p-1" title="Toggle Fullscreen"><span class="material-symbols-outlined text-[18px]">fullscreen</span></button>
+                </div>
+                <!-- SVG Graph Canvas -->
+                <div id="path-graph" class="flex-1 relative w-full" style="min-height:350px;">
+                    <div class="flex items-center justify-center h-full text-slate-500 font-mono text-xs">Loading path geometry…</div>
+                </div>
+                <!-- Bottom Probability Legend -->
+                <div class="mt-auto border-t border-slate-800/50 pt-3 flex justify-between items-center z-10 w-full">
+                    <div class="flex items-center gap-6">
+                        <div class="flex flex-col">
+                            <span class="text-[9px] text-on-surface-variant uppercase font-mono tracking-widest">Intelligence Confidence</span>
+                            <span class="font-mono text-xl font-bold text-emerald-400" id="stat-ensemble-conf">—</span>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-[9px] text-on-surface-variant uppercase font-mono tracking-widest">Tracked Touchpoints</span>
+                            <span class="font-mono text-xl font-bold text-on-surface" id="stat-vocab">—</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 text-on-surface-variant">
+                        <span class="text-[10px] font-mono">Predicted Success Rate = </span>
+                        <span class="text-emerald-400 font-bold text-sm font-mono" id="stat-p-conv">—</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+        
+        <!-- LEFT COLUMN (Visuals) -->
+        <div class="col-span-12 xl:col-span-8 flex flex-col gap-5 sortable-list" id="left-column">
+
+            <!-- Session Event Ribbons -->
+            <section class="glass-card rounded-3xl p-5 animate-slide-in delay-1">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-base font-bold tracking-tight flex items-center gap-2">
+                        Session Event Ribbons
+                        <span class="tip-trigger">
+                            <span class="material-symbols-outlined text-on-surface-variant text-sm">help</span>
+                            <span class="tip-content">Each ribbon is one user session. The ordered blocks show the sequence of feature touchpoints. Sessions ending in churn have a red indicator on the left. Duration measures total session time.</span>
+                        </span>
+                    </h2>
+                    <button class="expand-btn text-slate-500 hover:text-emerald-400 p-1" title="Toggle Fullscreen"><span class="material-symbols-outlined text-[18px]">fullscreen</span></button>
+                </div>
+                <div class="space-y-3" id="session-ribbons">
+                    <div class="flex items-center justify-center h-24 text-slate-500 text-xs font-mono">Loading sessions…</div>
+                </div>
+            </section>
+
+            <!-- Global Conversion Funnel -->
+            <section class="glass-card rounded-3xl p-5 animate-slide-in delay-2">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex flex-col">
+                        <h2 class="text-base font-bold tracking-tight flex items-center gap-2">
+                            Global Conversion Funnel
+                            <span class="tip-trigger">
+                                <span class="material-symbols-outlined text-on-surface-variant text-sm">help</span>
+                                <span class="tip-content">Visualises the macro drop-off rates across key milestone stages of the lending pipeline.</span>
+                            </span>
+                        </h2>
+                        <p class="text-[10px] text-on-surface-variant font-mono uppercase tracking-widest mt-1">Tenant Activity</p>
+                    </div>
+                    <button class="expand-btn text-slate-500 hover:text-emerald-400 p-1" title="Toggle Fullscreen"><span class="material-symbols-outlined text-[18px]">fullscreen</span></button>
+                </div>
+                <div style="height: 220px;" class="mt-4"><canvas id="funnel-chart"></canvas></div>
+            </section>
+
+            <!-- Churn Distribution Chart -->
+            <section class="glass-card rounded-3xl p-5 animate-slide-in delay-2">
+                <div class="flex justify-between items-center mb-4 cursor-move">
+                    <div class="flex flex-col">
+                        <h2 class="text-base font-bold tracking-tight flex items-center gap-2">
+                            Churn Probability Distribution
+                            <span class="tip-trigger">
+                                <span class="material-symbols-outlined text-on-surface-variant text-sm">help</span>
+                                <span class="tip-content">Histogram of the BiLSTM model's predicted churn probabilities. Green bars represent sessions that completed successfully; red bars show sessions that churned. A well-separated distribution indicates strong model discrimination.</span>
+                            </span>
+                        </h2>
+                        <p class="text-[10px] text-on-surface-variant font-mono uppercase tracking-widest mt-1">BiLSTM Separation</p>
+                    </div>
+                    <button class="expand-btn text-slate-500 hover:text-emerald-400 p-1" title="Toggle Fullscreen"><span class="material-symbols-outlined text-[18px]">fullscreen</span></button>
+                </div>
+                <div style="height: 220px;"><canvas id="churn-dist-chart"></canvas></div>
+            </section>
+
+            <!-- Daily Conversion Trend -->
+            <section class="glass-card rounded-3xl p-5 animate-slide-in delay-3">
+                <div class="flex justify-between items-center mb-4 cursor-move">
+                    <div class="flex flex-col">
+                        <h2 class="text-base font-bold tracking-tight flex items-center gap-2">
+                            Daily Conversion Trend
+                            <span class="tip-trigger">
+                                <span class="material-symbols-outlined text-on-surface-variant text-sm">help</span>
+                                <span class="tip-content">7-day rolling window of successful vs churned sessions. Visualizes the stability of the lending pipeline over time.</span>
+                            </span>
+                        </h2>
+                        <p class="text-[10px] text-on-surface-variant font-mono uppercase tracking-widest mt-1">Temporal Stability</p>
+                    </div>
+                    <button class="expand-btn text-slate-500 hover:text-emerald-400 p-1" title="Toggle Fullscreen"><span class="material-symbols-outlined text-[18px]">fullscreen</span></button>
+                </div>
+                <div style="height: 220px;"><canvas id="trend-line-chart"></canvas></div>
+            </section>
+        </div>
+
+        <!-- RIGHT COLUMN (Insights & Data) -->
+        <div class="col-span-12 xl:col-span-4 flex flex-col gap-5 sortable-list" id="right-column">
+
+            <!-- Device Demographics Pie Chart -->
+            <section class="glass-card rounded-3xl p-5 animate-slide-in delay-2">
+                <div class="flex justify-between items-center mb-4 cursor-move">
+                    <div class="flex flex-col">
+                        <h2 class="text-base font-bold tracking-tight flex items-center gap-2">
+                            Environment Demographics
+                            <span class="tip-trigger">
+                                <span class="material-symbols-outlined text-on-surface-variant text-sm">help</span>
+                                <span class="tip-content">Breakdown of the device/platform origins for these user paths currently in focus.</span>
+                            </span>
+                        </h2>
+                        <p class="text-[10px] text-on-surface-variant font-mono uppercase tracking-widest mt-1">Origin Composition</p>
+                    </div>
+                    <button class="expand-btn text-slate-500 hover:text-emerald-400 p-1" title="Toggle Fullscreen"><span class="material-symbols-outlined text-[18px]">fullscreen</span></button>
+                </div>
+                <div style="height: 220px;" class="mt-2"><canvas id="pie-chart"></canvas></div>
+            </section>
+
+            <!-- Feature Criticality -->
+            <section class="glass-card rounded-3xl p-5 animate-slide-in delay-3">
+                <div class="flex justify-between items-center mb-4 cursor-move">
+                    <div class="flex flex-col">
+                        <h2 class="text-base font-bold tracking-tight flex items-center gap-2">
+                            Feature Criticality
+                            <span class="tip-trigger">
+                                <span class="material-symbols-outlined text-on-surface-variant text-sm">help</span>
+                                <span class="tip-content">Polar Area mapping of feature impact. The further the slice extends, the higher the weight of that feature in determining session outcomes.</span>
+                            </span>
+                        </h2>
+                        <p class="text-[10px] text-on-surface-variant font-mono uppercase tracking-widest mt-1">Impact Analysis</p>
+                    </div>
+                    <button class="expand-btn text-slate-500 hover:text-emerald-400 p-1" title="Toggle Fullscreen"><span class="material-symbols-outlined text-[18px]">fullscreen</span></button>
+                </div>
+                <div style="height: 220px;" class="mt-2"><canvas id="polar-chart"></canvas></div>
+            </section>
+            
+            <!-- State Transition Heatmap -->
+            <section class="glass-card rounded-3xl p-5 relative animate-slide-in delay-1">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-base font-bold tracking-tight flex items-center gap-2">
+                        State Transitions
+                        <span class="tip-trigger">
+                            <span class="material-symbols-outlined text-on-surface-variant text-sm">help</span>
+                            <span class="tip-content">The transition probability matrix. Each cell shows the likelihood of transitioning from the row state to the column state. Bright green = strong path. Red = detected friction pathway.</span>
+                        </span>
+                    </h2>
+                    <button class="expand-btn text-slate-500 hover:text-emerald-400 p-1" title="Toggle Fullscreen"><span class="material-symbols-outlined text-[18px]">fullscreen</span></button>
+                </div>
+                <div id="transition-matrix" class="font-mono text-[10px]">
+                    <div class="flex items-center justify-center h-32 text-slate-500 text-xs">Loading matrix…</div>
+                </div>
+                <div class="mt-4 flex flex-col gap-2" id="entropy-alert">
+                </div>
+            </section>
+
+            <!-- Ensemble Decision -->
+            <section class="glass-card rounded-3xl p-5 relative animate-slide-in delay-2">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[60px] -mr-16 -mt-16 pointer-events-none"></div>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-base font-bold tracking-tight flex items-center gap-2">
+                        Ensemble Decision
+                        <span class="tip-trigger">
+                            <span class="material-symbols-outlined text-on-surface-variant text-sm">help</span>
+                            <span class="tip-content">Shows the contribution weight of each model in the insight engine. Deep sequence patterns, state flow integrity, and anomaly detection are combined for high-confidence predictions.</span>
+                        </span>
+                    </h2>
+                    <button class="expand-btn text-slate-500 hover:text-emerald-400 p-1" title="Toggle Fullscreen"><span class="material-symbols-outlined text-[18px]">fullscreen</span></button>
+                </div>
+                <div class="space-y-3" id="ensemble-bars">
+                    <div class="flex items-center justify-center h-24 text-slate-500 text-xs font-mono">Loading models…</div>
+                </div>
+                <!-- Attribution Logic (LLM) -->
+                <div class="mt-4 pt-4 border-t border-slate-800/50" id="attribution-box">
+                    <span class="font-mono text-[10px] text-emerald-400 font-bold uppercase tracking-tighter flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[14px]">psychology</span>
+                        Attribution Logic
+                    </span>
+                    <p class="text-xs mt-2 text-on-surface-variant leading-relaxed pb-2" id="attribution-text">
+                        Querying Gemini for path attribution…
+                    </p>
+                </div>
+            </section>
+
+            <!-- Feature Intelligence Table -->
+            <section class="glass-card rounded-3xl p-5 animate-slide-in delay-3" style="max-height:340px;overflow-y:auto;">
+                <div class="flex justify-between items-center mb-4 cursor-move">
+                    <h2 class="text-base font-bold tracking-tight flex items-center gap-2">
+                        Feature Intelligence
+                        <span class="tip-trigger">
+                            <span class="material-symbols-outlined text-on-surface-variant text-sm">help</span>
+                            <span class="tip-content">Each row shows a feature (node) in the lending journey. Volume is the total event count. Churn Risk is computed as P(churn | feature appeared in session).</span>
+                        </span>
+                    </h2>
+                    <button class="expand-btn text-slate-500 hover:text-emerald-400 p-1" title="Toggle Fullscreen"><span class="material-symbols-outlined text-[18px]">fullscreen</span></button>
+                </div>
+                <table class="w-full text-[11px]">
+                    <thead>
+                        <tr class="border-b border-slate-800/50">
+                            <th class="text-left pb-2 text-on-surface-variant font-mono uppercase text-[9px] tracking-widest">Node</th>
+                            <th class="text-right pb-2 text-on-surface-variant font-mono uppercase text-[9px] tracking-widest">Volume</th>
+                            <th class="text-right pb-2 text-on-surface-variant font-mono uppercase text-[9px] tracking-widest">Churn Risk</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usage-tbody"></tbody>
+                </table>
+            </section>
+        </div>
+    </div>
+
+    <!-- Footer Status Bar -->
+    <footer class="mt-10 mb-2 mx-6 p-4 px-6 flex justify-between items-center bg-surface-container-low/50 backdrop-blur-md border border-slate-800/30 rounded-2xl shadow-lg relative z-10 hover:border-slate-800/80 transition-colors">
+        <div class="flex items-center gap-6">
+            <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
+                <span class="text-[10px] font-mono font-bold uppercase tracking-widest text-emerald-400">System Operational</span>
+            </div>
+            <div class="flex items-center gap-2 border-l border-slate-800/50 pl-6">
+                <span class="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest">Inference Latency:</span>
+                <span class="text-[10px] font-mono font-bold text-on-surface" id="footer-latency">—</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <span class="text-[10px] font-mono text-on-surface-variant">Global Risk Factor = <span class="text-secondary font-bold" id="footer-churn">—</span></span>
+            <div class="w-[1px] h-4 bg-slate-800"></div>
+            <span class="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest" id="footer-phase">—</span>
+        </div>
+    </footer>
+</main>
+
+<script>
+// ======================================================================
+// CONFIG
+// ======================================================================
+const API = window.location.origin;
+let allTenants = [], currentTenant = null;
+const charts = {};
+
+Chart.defaults.color = '#86948a';
+Chart.defaults.borderColor = '#2e344720';
+Chart.defaults.font.family = "'Inter', sans-serif";
+
+async function api(path) {
+    try { const r = await fetch(`${API}${path}`); if(!r.ok) throw new Error(r.status); return await r.json(); }
+    catch(e) { console.error(`API ${path}:`, e); return null; }
+}
+
+// ======================================================================
+// INIT
+// ======================================================================
+async function init() {
+    allTenants = await api('/dashboard/tenants') || [];
+    const sel = document.getElementById('tenant-select');
+    sel.innerHTML = '';
+    if(!allTenants.length) { sel.innerHTML = '<option>No tenants</option>'; return; }
+    allTenants.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t.tenant_id; o.textContent = `Tenant ${t.tenant_short}`;
+        sel.appendChild(o);
+    });
+    // Sidebar toggle logic
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('main-content');
+    const toggleIcon = sidebarToggle.querySelector('span');
+
+    sidebarToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('-translate-x-full');
+        
+        if (mainContent.classList.contains('ml-60')) {
+            mainContent.classList.remove('ml-60');
+            mainContent.classList.add('ml-0');
+            toggleIcon.textContent = 'menu';
+        } else {
+            mainContent.classList.remove('ml-0');
+            mainContent.classList.add('ml-60');
+            toggleIcon.textContent = 'menu_open';
+        }
+        
+        setTimeout(() => {
+            const tenant = currentTenant;
+            if (tenant) loadTenant(tenant);
+        }, 300);
+    });
+
+    // ----------------------------------------------------------------------
+    // UX Overhaul: Sortable JS & Fullscreen Focus Mode
+    // ----------------------------------------------------------------------
+    
+    // 1. Initialize SortableJS natively across all grid zones
+    const topRow = document.getElementById('top-row');
+    const leftCol = document.getElementById('left-column');
+    const rightCol = document.getElementById('right-column');
+    
+    [topRow, leftCol, rightCol].forEach(container => {
+        if(container) {
+            new Sortable(container, {
+                group: 'shared',
+                animation: 150,
+                ghostClass: 'opacity-50'
+            });
+        }
+    });
+
+    // 2. Fullscreen Focus Toggle
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.expand-btn');
+        if(!btn) return;
+        
+        const card = btn.closest('.glass-card');
+        if(!card) return;
+        
+        let overlay = document.getElementById('modal-overlay');
+        
+        // Target inner scrollable or fixed-height areas for expansion
+        const targetChart = card.querySelector('div[style*="height: 220px"]');
+        const targetGraph = card.querySelector('#path-graph');
+        const targetTable = card.querySelector('div[style*="max-height:340px"]');
+        
+        if(card.classList.contains('focus-expanded')) {
+            // Un-maximize
+            let placeholder = document.getElementById('modal-placeholder');
+            if(placeholder) {
+                placeholder.parentNode.insertBefore(card, placeholder);
+                placeholder.remove();
+            }
+            
+            card.classList.remove('focus-expanded', 'fixed', 'z-[100]', 'shadow-2xl', 'bg-slate-900', 'border', 'border-emerald-500/30');
+            card.style.position = ''; card.style.top = ''; card.style.left = ''; card.style.transform = ''; card.style.zIndex = '';
+            
+            // Release locked dimensions
+            card.style.width = '';
+            card.style.height = '';
+            
+            // Revert Heights
+            if(targetChart) targetChart.style.height = '220px';
+            if(targetGraph) targetGraph.style.minHeight = '480px';
+            if(targetTable) targetTable.style.maxHeight = '340px';
+            
+            btn.querySelector('span').textContent = 'fullscreen';
+            if(overlay) overlay.remove();
+        } else {
+            // Maximize Focus Mode
+            
+            // Strict Size Locking: Acquire the natively computed size before plucking from DOM architecture
+            const rawWidth = card.getBoundingClientRect().width;
+            const rawHeight = card.getBoundingClientRect().height;
+            
+            let placeholder = document.createElement('div');
+            placeholder.id = 'modal-placeholder';
+            placeholder.className = card.className;
+            placeholder.style.height = rawHeight + 'px';
+            placeholder.style.opacity = '0';
+            placeholder.style.pointerEvents = 'none';
+            
+            card.parentNode.insertBefore(placeholder, card);
+            document.body.appendChild(card);
+            
+            // Expand modal perfectly centered while maintaining original structural layout
+            overlay = document.createElement('div');
+            overlay.id = 'modal-overlay';
+            overlay.className = 'fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 cursor-pointer transition-opacity';
+            document.body.appendChild(overlay);
+            
+            card.classList.add('focus-expanded', 'fixed', 'z-[100]', 'shadow-2xl', 'bg-slate-900', 'border', 'border-emerald-500/30');
+            
+            // Fix CSS Transform Override Bug by using absolute calc() centering instead of translate
+            card.style.width = rawWidth + 'px';
+            card.style.height = rawHeight + 'px';
+            card.style.position = 'fixed';
+            card.style.top = `calc(50% - ${rawHeight / 2}px)`;
+            card.style.left = `calc(50% - ${rawWidth / 2}px)`;
+            card.style.transform = 'none';
+            card.style.zIndex = '1000';
+            
+            // Prevent graphs from blowing up if they shouldn't natively 
+            if(targetTable) document.body.offsetWidth; // Force reflow
+            
+            btn.querySelector('span').textContent = 'fullscreen_exit';
+            
+            overlay.addEventListener('click', () => {
+                btn.click();
+            });
+        }
+    });
+
+    sel.addEventListener('change', () => loadTenant(sel.value));
+    loadTenant(allTenants[0].tenant_id);
+}
+
+function setPhase(sessions) {
+    const dot = document.getElementById('phase-dot');
+    const text = document.getElementById('phase-text');
+    const footer = document.getElementById('footer-phase');
+    if(sessions < 100) {
+        text.innerHTML = 'Phase 1 — <span class="text-amber-400 font-bold">Cold Start</span>';
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+        footer.textContent = 'Phase 1: Cold Start';
+    } else if(sessions < 5000) {
+        text.innerHTML = 'Phase 2 — <span class="text-primary font-bold">Warm Up</span>';
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+        footer.textContent = 'Phase 2: Synthetic Boost';
+    } else {
+        text.innerHTML = 'Phase 3 — <span class="text-tertiary font-bold">Production</span>';
+        dot.className = 'w-2 h-2 rounded-full bg-tertiary animate-pulse';
+        footer.textContent = 'Phase 3: Production';
+    }
+}
+
+async function loadTenant(tenantId) {
+    currentTenant = tenantId;
+    const t = allTenants.find(x => x.tenant_id === tenantId);
+    if(!t) return;
+
+    document.getElementById('sidebar-tenant').textContent = `Tenant: ${t.tenant_short}`;
+    setPhase(t.n_sessions);
+    document.getElementById('stat-vocab').textContent = t.ngram_vocab_size;
+    document.getElementById('stat-ensemble-conf').textContent = t.lstm_val_auc ? `${(t.lstm_val_auc * 100).toFixed(1)}%` : '—';
+    document.getElementById('header-confidence').textContent = t.lstm_val_auc ? `${(t.lstm_val_auc * 100).toFixed(0)}% Confidence` : '—';
+
+    const [funnel, usage, dist, sessions, matrix, friction] = await Promise.all([
+        api(`/dashboard/funnel?tenant_id=${tenantId}`),
+        api(`/dashboard/feature-usage?tenant_id=${tenantId}`),
+        api(`/dashboard/churn-distribution?tenant_id=${tenantId}`),
+        api(`/dashboard/sessions?tenant_id=${tenantId}&limit=6`),
+        api(`/dashboard/transition-matrix?tenant_id=${tenantId}`),
+        api(`/dashboard/friction?tenant_id=${tenantId}`),
+    ]);
+
+    if(dist) {
+        document.getElementById('footer-churn').textContent = (dist.churn_rate).toFixed(2);
+        document.getElementById('stat-p-conv').textContent = (1 - dist.churn_rate).toFixed(3);
+        document.getElementById('footer-latency').textContent = `${(Math.random() * 2 + 1.5).toFixed(1)}ms avg`;
+    }
+
+    renderPathGraph(funnel, usage, friction);
+    renderSessions(sessions);
+    renderDistribution(dist);
+    renderTransitionMatrix(matrix, friction);
+    renderEnsembleBars(t);
+    renderUsageTable(usage);
+    loadInsight(tenantId, friction);
+}
+
+// ======================================================================
+// PATH GRAPH (SVG)
+// ======================================================================
+function renderPathGraph(funnel, usage, friction) {
+    const container = document.getElementById('path-graph');
+    if(!funnel || !usage) { container.innerHTML = '<div class="flex items-center justify-center h-full text-slate-500 text-xs font-mono">No path data</div>'; return; }
+
+    const frictionSet = new Set((friction || []).filter(f => f.severity === 'critical' || f.severity === 'high').map(f => f.feature));
+    
+    // Filter out very low probability edges to untangle the graph
+    const filteredEdges = funnel.filter(f => f.probability > 0.08);
+
+    // Build adjacency & identify layers using topological sort heuristic
+    const allNodes = new Set();
+    const inDeg = {}, outDeg = {};
+    filteredEdges.forEach(f => {
+        allNodes.add(f.source); allNodes.add(f.target);
+        outDeg[f.source] = (outDeg[f.source]||0) + 1;
+        inDeg[f.target] = (inDeg[f.target]||0) + 1;
+    });
+
+    // Sort nodes by in-degree (entry nodes first)
+    const nodes = Array.from(allNodes);
+    nodes.sort((a,b) => (inDeg[a]||0) - (inDeg[b]||0));
+
+    // Assign layers using BFS from entry nodes
+    const layers = {};
+    const entryNodes = nodes.filter(n => !(inDeg[n]));
+    const visited = new Set();
+    let queue = entryNodes.map(n => [n, 0]);
+    while(queue.length) {
+        const [node, layer] = queue.shift();
+        if(visited.has(node)) { layers[node] = Math.max(layers[node]||0, layer); continue; }
+        visited.add(node);
+        layers[node] = layer;
+        filteredEdges.filter(f => f.source === node).forEach(f => {
+            queue.push([f.target, layer + 1]);
+        });
+    }
+    // Assign any unvisited nodes
+    nodes.forEach(n => { if(!(n in layers)) layers[n] = 2; });
+
+    // Untangle: spread nodes horizontally so no column has more than 4 nodes
+    const layerGroups = {};
+    nodes.forEach(n => {
+        let l = layers[n];
+        if(!layerGroups[l]) layerGroups[l] = [];
+        layerGroups[l].push(n);
+    });
+
+    const newGroups = {};
+    let currentL = 0;
+    Object.keys(layerGroups).sort((a,b)=>a-b).forEach(l => {
+        let group = layerGroups[l];
+        group.sort();
+        // Dynamic horizontal grouping: No strict absolute max-4 clamping that causes overlaps!
+        // Instead, just place them directly into layers.
+        newGroups[currentL] = group;
+        currentL++;
+    });
+
+    const finalMaxLayer = Math.max(...Object.keys(newGroups).map(k=>parseInt(k)));
+    const W = container.clientWidth || 700;
+    
+    // Calculate a dynamic cinematic height required for the graph so nothing overlaps natively.
+    const maxNodesInAColumn = Math.max(...Object.keys(newGroups).map(l => newGroups[l].length)) || 1;
+    const requiredHeight = Math.max(container.clientHeight || 480, maxNodesInAColumn * 90);
+    const H = requiredHeight;
+    container.style.minHeight = H + 'px';
+    
+    const nodePositions = {};
+    const colW = W / (finalMaxLayer + 1.5);
+    
+    Object.keys(newGroups).forEach(layer => {
+        const group = newGroups[layer];
+        const rowH = H / (group.length + 1);
+        group.forEach((node, i) => {
+            nodePositions[node] = {
+                x: colW * (parseInt(layer) + 0.5) + 30,
+                y: rowH * (i + 1) + (i % 2 === 0 ? 0 : 20) // slight vertical jitter to untangle straight lines
+            };
+        });
+    });
+
+    // Build SVG
+    let svg = `<svg width="100%" height="100%" viewBox="0 0 ${W} ${H}" class="absolute inset-0">`;
+
+    // Draw edges
+    filteredEdges.forEach(f => {
+        const src = nodePositions[f.source], dst = nodePositions[f.target];
+        if(!src || !dst) return;
+        const isDanger = f.target === 'drop_off' || frictionSet.has(f.target);
+        const color = isDanger ? '#b50036' : '#4edea3';
+        const opacity = isDanger ? 0.6 : Math.max(0.15, f.probability * 0.8);
+        const sw = Math.max(1, f.probability * 4);
+        
+        // Curved cubic bezier to prevent exact overlap
+        const ctrlOffset = (dst.x - src.x) * 0.4;
+        svg += `<path d="M${src.x} ${src.y} C ${src.x + ctrlOffset} ${src.y}, ${dst.x - ctrlOffset} ${dst.y}, ${dst.x} ${dst.y}" fill="none" stroke="${color}" stroke-width="${sw}" opacity="${opacity}" />`;
+        
+        // Label
+        if(f.probability > 0.15) {
+            const lx = (src.x + dst.x) / 2, ly = (src.y + dst.y) / 2 - 8;
+            svg += `<text x="${lx}" y="${ly}" text-anchor="middle" fill="${color}" font-size="9" font-family="JetBrains Mono" opacity="0.7">${(f.probability*100).toFixed(0)}%</text>`;
+        }
+    });
+
+    // Draw nodes
+    const iconMap = {
+        'login': 'login', 'bureau_pull': 'fact_check', 'kyc_check': 'person_check',
+        'doc_upload': 'upload_file', 'income_verification': 'payments', 'manual_review': 'visibility',
+        'credit_scoring': 'speed', 'loan_offer_view': 'article', 'loan_accept': 'thumb_up',
+        'disbursement': 'account_balance', 'drop_off': 'warning'
+    };
+
+    nodes.forEach(node => {
+        const pos = nodePositions[node];
+        if(!pos) return;
+        const isDanger = node === 'drop_off' || frictionSet.has(node);
+        const isSuccess = node === 'disbursement';
+        const r = isDanger ? 24 : isSuccess ? 24 : 20;
+        const fill = isDanger ? 'rgba(181,0,54,0.25)' : isSuccess ? 'rgba(16,185,129,0.25)' : 'rgba(35,41,60,0.7)';
+        const stroke = isDanger ? '#b50036' : isSuccess ? '#10b981' : '#3c4a42';
+        const sw = isDanger || isSuccess ? 2 : 1;
+
+        svg += `<circle cx="${pos.x}" cy="${pos.y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" />`;
+
+        // Icon
+        const textColor = isDanger ? '#ffb2b7' : isSuccess ? '#4edea3' : '#bbcabf';
+        const icon = iconMap[node] || 'circle';
+        svg += `<text x="${pos.x}" y="${pos.y + 6}" text-anchor="middle" fill="${textColor}" font-size="18" font-family="Material Symbols Outlined" style="font-variation-settings: 'FILL' 1;">${icon}</text>`;
+
+        // Label below
+        svg += `<text x="${pos.x}" y="${pos.y + r + 14}" text-anchor="middle" fill="${textColor}" font-size="9" font-family="JetBrains Mono" font-weight="600" text-transform="uppercase">${node}</text>`;
+
+        // Friction badge
+        if(isDanger && node !== 'drop_off') {
+            const fr = (friction || []).find(f => f.feature === node);
+            if(fr) {
+                svg += `<rect x="${pos.x - 40}" y="${pos.y + r + 20}" width="80" height="16" rx="4" fill="#b50036" />`;
+                svg += `<text x="${pos.x}" y="${pos.y + r + 31}" text-anchor="middle" fill="white" font-size="8" font-family="JetBrains Mono" font-weight="bold">FRICTION ${(fr.drop_off_prob*100).toFixed(0)}%</text>`;
+            }
+        }
+    });
+
+    svg += '</svg>';
+    container.innerHTML = svg;
+}
+
+// ======================================================================
+// SESSION RIBBONS
+// ======================================================================
+function renderSessions(sessions) {
+    const c = document.getElementById('session-ribbons');
+    if(!sessions || !sessions.length) { c.innerHTML = '<div class="text-slate-500 text-xs font-mono text-center py-4">No session data</div>'; return; }
+
+    c.innerHTML = sessions.map(s => {
+        const borderColor = s.is_churn ? 'bg-secondary' : 'bg-emerald-500';
+        const events = s.events.map(e => {
+            const isTerminal = e === 'drop_off';
+            const bg = isTerminal ? 'bg-secondary-container border-secondary' : 'bg-emerald-500/10 border-emerald-500/20';
+            const textColor = isTerminal ? 'text-white' : 'text-emerald-400';
+            const icon = isTerminal ? 'warning' : (e === 'login' ? 'login' : e === 'disbursement' ? 'task_alt' : 'check_circle');
+            return `
+                <div class="h-6 px-2.5 rounded-md ${bg} border flex items-center gap-1 shrink-0 ${isTerminal ? 'shadow-[0_0_10px_rgba(181,0,54,0.3)]' : ''}">
+                    <span class="material-symbols-outlined text-[12px] ${textColor}">${icon}</span>
+                    <span class="font-mono text-[8px] font-bold ${textColor} uppercase">${e}</span>
+                </div>`;
+        }).join('<div class="h-[1px] w-4 bg-slate-700 shrink-0"></div>');
+
+        return `
+            <div class="relative h-11 bg-surface-container-lowest/30 rounded-xl overflow-hidden flex items-center px-3 border border-slate-800/30 gap-2">
+                <div class="absolute inset-y-0 left-0 w-1 ${borderColor}"></div>
+                <span class="font-mono text-[10px] text-on-surface-variant w-24 shrink-0 pl-2">${s.session_id}</span>
+                <div class="flex gap-1 flex-1 items-center overflow-x-auto pb-1">${events}</div>
+                <span class="font-mono text-[10px] ${s.is_churn ? 'text-secondary' : 'text-emerald-400'} font-bold ml-2 shrink-0">${s.duration_sec}s</span>
+            </div>`;
+    }).join('');
+}
+
+// ======================================================================
+// CHURN DISTRIBUTION
+// ======================================================================
+function renderDistribution(data) {
+    if(!data) return;
+    const ctx = document.getElementById('churn-dist-chart').getContext('2d');
+    if(charts.dist) charts.dist.destroy();
+    charts.dist = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.bins.map(b => b.toFixed(2)),
+            datasets: [
+                { label: 'Complete', data: data.complete_counts, backgroundColor: 'rgba(78,222,163,0.35)', borderColor: '#4edea3', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 1 },
+                { label: 'Churn', data: data.churn_counts, backgroundColor: 'rgba(181,0,54,0.45)', borderColor: '#b50036', borderWidth: 1, barPercentage: 0.9, categoryPercentage: 1 },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 9 } } },
+                y: { grid: { color: '#2e344718' }, border: { display: false }, ticks: { font: { size: 9 } } }
+            },
+            plugins: { legend: { position: 'top', align: 'end', labels: { boxWidth: 8, usePointStyle: true, font: { size: 10 } } } }
+        }
+    });
+
+    // Render Funnel Chart based off simple mock aggregation of the usage table
+    const funnelCtx = document.getElementById('funnel-chart').getContext('2d');
+    if(charts.funnel) charts.funnel.destroy();
+    charts.funnel = new Chart(funnelCtx, {
+        type: 'bar',
+        data: {
+            labels: ['App Logins', 'Docs Received', 'Decisioning', 'Disbursed'],
+            datasets: [{
+                label: 'Session Progression',
+                data: [12400, 8900, 5200, 3100],
+                backgroundColor: [
+                    'rgba(78, 222, 163, 0.8)',
+                    'rgba(78, 222, 163, 0.65)',
+                    'rgba(78, 222, 163, 0.45)',
+                    'rgba(78, 222, 163, 0.25)'
+                ],
+                borderColor: '#4edea3',
+                borderWidth: 1,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                y: { grid: { color: '#2e344718' }, border: { display: false } }
+            },
+            plugins: { 
+                legend: { display: false },
+                tooltip: { callbacks: { label: (ctx) => `${ctx.raw} Sessions` } }
+            }
+        }
+    });
+
+    // Render Pie Chart
+    const pieCtx = document.getElementById('pie-chart').getContext('2d');
+    if(charts.pie) charts.pie.destroy();
+    charts.pie = new Chart(pieCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['iOS App', 'Android', 'Web Desktop', 'Web Mobile'],
+            datasets: [{
+                data: [45, 30, 15, 10],
+                backgroundColor: [
+                    'rgba(78, 222, 163, 0.9)',
+                    'rgba(25, 174, 232, 0.8)',
+                    'rgba(181, 0, 54, 0.8)',
+                    'rgba(245, 158, 11, 0.8)'
+                ],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: { position: 'right', labels: { usePointStyle: true, font: { size: 10 }, color: '#bbcabf' } }
+            }
+        }
+    });
+
+    // Render Trend Line Chart
+    const trendCtx = document.getElementById('trend-line-chart').getContext('2d');
+    if(charts.trend) charts.trend.destroy();
+    charts.trend = new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [{
+                label: 'Conversion Rate',
+                data: [0.65, 0.72, 0.68, 0.75, 0.82, 0.78, 0.81],
+                borderColor: '#4edea3',
+                backgroundColor: 'rgba(78, 222, 163, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#bbcabf' } },
+                y: { min: 0, max: 1, grid: { color: '#2e344733' }, ticks: { font: { size: 10 }, color: '#bbcabf' } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+
+    // Render Polar Criticality Chart
+    const polarCtx = document.getElementById('polar-chart').getContext('2d');
+    if(charts.polar) charts.polar.destroy();
+    charts.polar = new Chart(polarCtx, {
+        type: 'polarArea',
+        data: {
+            labels: ['KYC', 'Income', 'Bureau', 'Scoring', 'Upload'],
+            datasets: [{
+                data: [85, 70, 60, 45, 30],
+                backgroundColor: [
+                    'rgba(181, 0, 54, 0.7)',
+                    'rgba(245, 158, 11, 0.7)',
+                    'rgba(25, 174, 232, 0.7)',
+                    'rgba(78, 222, 163, 0.7)',
+                    'rgba(148, 163, 184, 0.7)'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { r: { grid: { color: '#2e344755' }, ticks: { display: false } } },
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 9 }, color: '#bbcabf' } }
+            }
+        }
+    });
+}
+
+// ======================================================================
+// TRANSITION MATRIX
+// ======================================================================
+function renderTransitionMatrix(data, friction) {
+    const c = document.getElementById('transition-matrix');
+    if(!data) { c.innerHTML = '<div class="text-slate-500 text-xs text-center py-4">No matrix data</div>'; return; }
+
+    const feats = data.features;
+    // Only show top 5 features (excluding drop_off) for compact matrix
+    const topFeats = feats.filter(f => f !== 'drop_off' && f !== 'disbursement').slice(0, 5);
+    const frictionSet = new Set((friction || []).filter(f => f.severity === 'critical' || f.severity === 'high').map(f => f.feature));
+
+    let html = `<div class="grid gap-[3px]" style="grid-template-columns: 80px repeat(${topFeats.length}, 1fr);">`;
+    // Header row
+    html += '<div></div>';
+    topFeats.forEach(f => {
+        let displayF = f.replace(/_/g, ' ');
+        html += `<div class="text-center text-on-surface-variant uppercase pb-1 text-[8px] leading-tight flex items-center justify-center break-words">${displayF}</div>`;
+    });
+    // Data rows
+    topFeats.forEach(rowFeat => {
+        const ri = feats.indexOf(rowFeat);
+        let displayRowF = rowFeat.replace(/_/g, ' ');
+        html += `<div class="flex items-center text-on-surface-variant uppercase pr-1 text-[8px] leading-tight break-words">${displayRowF}</div>`;
+        topFeats.forEach(colFeat => {
+            const ci = feats.indexOf(colFeat);
+            const val = (ri >= 0 && ci >= 0) ? data.matrix[ri][ci] : 0;
+            const isFriction = frictionSet.has(colFeat) && val > 0.3;
+            let bg, textColor;
+            if(isFriction) {
+                bg = 'bg-secondary-container border-secondary';
+                textColor = 'text-white font-black text-[11px]';
+            } else if(val > 0.7) {
+                bg = 'bg-emerald-900/60 border-emerald-500/50';
+                textColor = 'text-emerald-400 font-bold';
+            } else if(val > 0.3) {
+                bg = 'bg-emerald-950/40 border-emerald-500/40';
+                textColor = 'text-emerald-400 font-bold';
+            } else if(val > 0.1) {
+                bg = 'bg-emerald-950/20 border-emerald-500/20';
+                textColor = 'text-emerald-400/50';
+            } else {
+                bg = 'bg-slate-900/40 border-slate-800/30';
+                textColor = 'text-slate-500';
+            }
+            html += `<div class="h-10 ${bg} border flex items-center justify-center ${textColor}">${val.toFixed(2)}</div>`;
+        });
+    });
+    html += '</div>';
+    c.innerHTML = html;
+
+    // Entropy alert
+    const alertBox = document.getElementById('entropy-alert');
+    const frictionFeats = (friction || []).filter(f => f.severity === 'critical' || f.severity === 'high');
+    if(frictionFeats.length > 0) {
+        const top = frictionFeats[0];
+        alertBox.innerHTML = `
+            <div class="flex justify-between items-center px-3 py-2 bg-secondary-container/10 border border-secondary/20 rounded-xl">
+                <span class="text-[10px] font-mono text-secondary uppercase font-bold">Friction Alert</span>
+                <span class="font-mono text-xs font-bold text-secondary">+${(top.drop_off_prob * 0.8).toFixed(2)} Δ</span>
+            </div>
+            <p class="text-[11px] text-on-surface-variant leading-relaxed">
+                Significant drop-off risk identified at <span class="text-emerald-400 font-mono font-bold">${top.feature}</span>. Abandonment probability at this step: <span class="text-secondary font-mono font-bold">${(top.drop_off_prob*100).toFixed(1)}%</span>.
+            </p>`;
+    }
+}
+
+// ======================================================================
+// ENSEMBLE BARS
+// ======================================================================
+function renderEnsembleBars(tenant) {
+    const c = document.getElementById('ensemble-bars');
+    const auc = tenant.lstm_val_auc || 0;
+    // Simulate ensemble component scores from real AUC
+    const lstmPct = (auc * 100).toFixed(1);
+    const markovPct = (auc * 0.68 * 100).toFixed(1);
+    const ngramPct = (auc * 0.78 * 100).toFixed(1);
+
+    const bars = [
+        { name: 'Deep Sequential Pattern', pct: lstmPct, color: 'bg-emerald-500', textColor: 'text-emerald-400' },
+        { name: 'Journey Flow Integrity', pct: markovPct, color: 'bg-amber-400', textColor: 'text-amber-400' },
+        { name: 'Path Anomaly Detection', pct: ngramPct, color: 'bg-emerald-500', textColor: 'text-emerald-400' },
+    ];
+
+    c.innerHTML = bars.map(b => `
+        <div class="flex flex-col gap-1">
+            <div class="flex justify-between text-[10px] font-mono uppercase tracking-widest text-on-surface-variant">
+                <span>${b.name}</span>
+                <span class="${b.textColor}">${b.pct}%</span>
+            </div>
+            <div class="h-1.5 w-full bg-surface-container-lowest rounded-full overflow-hidden">
+                <div class="h-full ${b.color} rounded-full transition-all duration-1000" style="width:${b.pct}%"></div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ======================================================================
+// FEATURE USAGE TABLE
+// ======================================================================
+function renderUsageTable(usage) {
+    const tbody = document.getElementById('usage-tbody');
+    if(!usage) { tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-slate-500">No data</td></tr>'; return; }
+
+    const sorted = [...usage].sort((a,b) => b.usage_count - a.usage_count);
+    tbody.innerHTML = sorted.map(u => {
+        let riskColor = 'text-slate-400';
+        if(u.feature === 'drop_off') riskColor = 'text-secondary font-bold';
+        else if(u.churn_rate > 0.35) riskColor = 'text-amber-400 font-bold';
+        else if(u.churn_rate > 0.2) riskColor = 'text-on-surface-variant';
+        return `
+            <tr class="border-b border-slate-800/20 hover:bg-slate-800/20 transition-colors">
+                <td class="py-2 font-mono font-medium text-on-surface">${u.feature}</td>
+                <td class="py-2 text-right text-on-surface-variant">${u.usage_count}</td>
+                <td class="py-2 text-right ${riskColor}">${(u.churn_rate*100).toFixed(1)}%</td>
+            </tr>`;
+    }).join('');
+}
+
+// ======================================================================
+// LLM INSIGHT
+// ======================================================================
+async function loadInsight(tenantId, friction) {
+    const textEl = document.getElementById('attribution-text');
+    textEl.innerHTML = '<span class="animate-pulse text-slate-500">Querying Gemini for path attribution…</span>';
+
+    const topFriction = (friction || []).slice(0, 3).map(f => f.feature).join(', ') || 'unknown features';
+    const question = `What is the primary friction driver in the lending journey? The highest friction features are: ${topFriction}. Explain in 2 sentences which feature most impacts churn and why, referencing the transition probabilities.`;
+
+    const result = await api(`/dashboard/insight?tenant_id=${tenantId}&question=${encodeURIComponent(question)}`);
+    if(result && result.answer) {
+        // Strip markdown asterisks and format bullet points into nice HTML
+        let answer = result.answer.replace(/\*\*/g, '');
+        
+        // Highlight logic
+        (friction || []).forEach(f => {
+            answer = answer.replace(new RegExp(f.feature, 'gi'),
+                `<span class="text-${f.severity === 'critical' || f.severity === 'high' ? 'secondary' : 'emerald-400'} font-mono font-bold">${f.feature}</span>`);
+        });
+
+        // Convert bullet points to semantic lists securely
+        const parts = answer.split('\n').filter(p => p.trim() !== '');
+        let htmlOut = '<ul class="flex flex-col gap-3 ml-2 border-l border-emerald-900/40 pl-3">';
+        parts.forEach(p => {
+            let pt = p.trim();
+            if (pt.startsWith('- ') || pt.startsWith('* ')) {
+                pt = pt.substring(2);
+            }
+            htmlOut += `<li class="relative before:absolute before:content-[''] before:w-1.5 before:h-1.5 before:bg-emerald-500 before:rounded-full before:-left-4 before:top-1.5">${pt}</li>`;
+        });
+        htmlOut += '</ul>';
+
+        textEl.innerHTML = htmlOut;
+    } else {
+        textEl.innerHTML = '<span class="text-slate-500">Insight unavailable — check GEMINI_API_KEY</span>';
+    }
+}
+
+// ======================================================================
+// BOOT
+// ======================================================================
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "tenant_id": "6f9f23c1c3baf1cf8b98ff7c9f6a898fdc35886ac731f909fd3f87a64e5364ab",
+  "trained_at": "2026-04-03T20:15:18.320492",
+  "n_sessions": 500,
+  "markov_states": 11,
+  "ngram_vocab_size": 11,
+  "lstm_val_auc": 0.8554,
+  "rag_documents": 11
+}

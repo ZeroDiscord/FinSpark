@@ -1,0 +1,7 @@
+deployment_mode: "cloud"  # or "on_prem"
+llm_routing:
+  on_prem: "llama3-70b"
+  cloud: "gpt-4o"
+confidence_threshold: 0.65
+pii_salt: "CHANGE_ME"
+session_gap_minutes: 30
