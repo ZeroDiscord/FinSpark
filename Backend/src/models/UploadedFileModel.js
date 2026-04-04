@@ -39,4 +39,16 @@ async function findUploadById(id) {
   return result.rows[0] || null;
 }
 
-module.exports = { createUpload, updateUploadStatus, findUploadById };
+async function findUploadByIdForOwner(id, ownerId) {
+  const result = await query(
+    `SELECT u.*
+     FROM uploads u
+     JOIN tenants t ON t.id = u.tenant_id
+     WHERE u.id = $1 AND t.owner_id = $2
+     LIMIT 1`,
+    [id, ownerId]
+  );
+  return result.rows[0] || null;
+}
+
+module.exports = { createUpload, updateUploadStatus, findUploadById, findUploadByIdForOwner };

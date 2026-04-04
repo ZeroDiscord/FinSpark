@@ -14,6 +14,8 @@ const { errorHandler } = require('./src/middleware/errorHandler');
 const authRoutes = require('./src/routes/auth.routes');
 const tenantRoutes = require('./routes/tenant.routes');
 const uploadRoutes = require('./src/routes/upload.routes');
+const detectRoutes = require('./src/routes/detect.routes');
+const eventsRoutes = require('./src/routes/events.routes');
 const featuresRoutes = require('./src/routes/features.routes');
 const trackingRoutes = require('./src/routes/tracking.routes');
 const dashboardRoutes = require('./src/routes/dashboard.routes');
@@ -55,6 +57,8 @@ app.use((req, _res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/tenants', tenantRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/detect', detectRoutes);
+app.use('/api/events', eventsRoutes);
 app.use('/api/features', featuresRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/dashboard', dashboardRoutes);

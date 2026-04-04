@@ -1,6 +1,6 @@
 'use strict';
 
-const { findUploadById } = require('../models/UploadedFileModel');
+const { findUploadById, findUploadByIdForOwner } = require('../models/UploadedFileModel');
 const { listFeaturesByTenant, listFeaturesByUpload } = require('../models/DetectedFeatureModel');
 const { findTenantByIdForOwner } = require('../models/TenantModel');
 const { NotFoundError } = require('../utils/errors');
@@ -8,6 +8,8 @@ const { NotFoundError } = require('../utils/errors');
 function buildHierarchy(features) {
   return features.map((feature) => ({
     id: feature.id,
+    raw_name: feature.raw_identifier || feature.name,
+    clean_name: feature.name,
     l1_domain: feature.l1_domain,
     l2_module: feature.l2_module,
     l3_feature: feature.l3_feature,
@@ -39,4 +41,20 @@ async function getFeaturesByResourceId(resourceId, userId) {
   };
 }
 
-module.exports = { getFeaturesByResourceId };
+async function getDetectionByUploadId(uploadId, userId = null) {
+  const upload = userId
+    ? await findUploadByIdForOwner(uploadId, userId)
+    : await findUploadById(uploadId);
+  if (!upload) throw new NotFoundError('Upload not found.');
+
+  const features = await listFeaturesByUpload(upload.id);
+  return {
+    upload_id: upload.id,
+    status: upload.status,
+    source_type: upload.source_type,
+    summary: upload.metadata?.detection_summary || null,
+    features: buildHierarchy(features),
+  };
+}
+
+module.exports = { getFeaturesByResourceId, getDetectionByUploadId };

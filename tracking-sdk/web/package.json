@@ -1,0 +1,13 @@
+{
+  "name": "@finspark/analytics-web-sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./react": "./src/react.js"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}
