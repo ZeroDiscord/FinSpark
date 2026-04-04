@@ -1,55 +1,40 @@
 'use strict';
 
-const { query } = require('../../db/client');
+const Recommendation = require('../database/models/Recommendation');
 
 async function listRecommendations(tenantId) {
-  const result = await query(
-    `SELECT * FROM recommendations WHERE tenant_id = $1 AND dismissed = FALSE
-     ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, created_at DESC`,
-    [tenantId]
-  );
-  return result.rows;
+  return Recommendation.find({ tenant_id: tenantId, status: { $ne: 'dismissed' } })
+    .sort({ priority: 1, created_at: -1 })
+    .lean();
 }
 
 async function findRecommendationById(tenantId, id) {
-  const result = await query(
-    `SELECT * FROM recommendations WHERE tenant_id = $1 AND id = $2 LIMIT 1`,
-    [tenantId, id]
-  );
-  return result.rows[0] || null;
+  return Recommendation.findOne({ _id: id, tenant_id: tenantId }).lean();
 }
 
 async function createRecommendation(tenantId, recommendation) {
-  const result = await query(
-    `INSERT INTO recommendations
-      (tenant_id, title, description, priority, category, affected_feature, metric_impact, action_type, rule_id, source_data, refreshed_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW())
-     RETURNING *`,
-    [
-      tenantId,
-      recommendation.title,
-      recommendation.description,
-      recommendation.priority,
-      recommendation.category,
-      recommendation.affected_feature,
-      recommendation.metric_impact || null,
-      recommendation.action_type || 'product_fix',
-      recommendation.rule_id || 'AUTO',
-      JSON.stringify(recommendation.source_data || {}),
-    ]
-  );
-  return result.rows[0];
+  const feature = recommendation.affected_feature || recommendation.feature || null;
+  const doc = await Recommendation.create({
+    tenant_id: tenantId,
+    title: recommendation.title,
+    problem: recommendation.problem || recommendation.description || '',
+    suggestion: recommendation.suggestion || recommendation.description || '',
+    priority: recommendation.priority || 'medium',
+    category: recommendation.category || 'general',
+    impact_score: recommendation.impact_score || null,
+    metrics: recommendation.metrics || {},
+    source_data: { ...(recommendation.source_data || {}), feature },
+    status: 'open',
+  });
+  return doc.toObject();
 }
 
 async function markRecommendationAsana(id, taskId, taskUrl) {
-  const result = await query(
-    `UPDATE recommendations
-     SET asana_task_id = $2, asana_task_url = $3
-     WHERE id = $1
-     RETURNING *`,
-    [id, taskId, taskUrl]
-  );
-  return result.rows[0];
+  return Recommendation.findByIdAndUpdate(
+    id,
+    { $set: { asana_task_gid: taskId, asana_task_url: taskUrl, status: 'sent' } },
+    { new: true }
+  ).lean();
 }
 
 module.exports = {

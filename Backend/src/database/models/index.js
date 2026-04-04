@@ -15,4 +15,5 @@ module.exports = {
   ProcessedSession: require('./ProcessedSession'),
   MlPrediction: require('./MlPrediction'),
   RawMetadata: require('./RawMetadata'),
+  RefreshToken: require('./RefreshToken'),
 };

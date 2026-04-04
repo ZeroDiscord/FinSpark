@@ -2,43 +2,34 @@
 
 const router = require('express').Router();
 const requireAuth = require('../middleware/auth');
-const { query } = require('../db/client');
 const mlClient = require('../services/mlClient');
 const { cacheInvalidateTenant } = require('../services/cacheService');
+const { listTenantsForOwner, findTenantByIdForOwner } = require('../src/models/TenantModel');
+const Tenant = require('../src/database/models/Tenant');
 
 // GET /api/tenants
 router.get('/', requireAuth, async (req, res, next) => {
   try {
-    const result = await query(
-      `SELECT id, company_name, tenant_hash, plan, ml_trained, trained_at, created_at
-       FROM tenants WHERE owner_id = $1 ORDER BY created_at DESC`,
-      [req.user.sub]
-    );
-    res.json(result.rows);
+    const tenants = await listTenantsForOwner(req.user.sub);
+    res.json(tenants);
   } catch (err) {
     next(err);
   }
 });
 
-// GET /api/tenants/:tenantId  (tenantId = tenant DB UUID)
+// GET /api/tenants/:tenantId
 router.get('/:tenantId', requireAuth, async (req, res, next) => {
   try {
-    const result = await query(
-      `SELECT id, company_name, tenant_hash, plan, ml_trained, trained_at, created_at
-       FROM tenants WHERE id = $1 AND owner_id = $2`,
-      [req.params.tenantId, req.user.sub]
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Tenant not found.' });
-    const tenant = result.rows[0];
+    const tenant = await findTenantByIdForOwner(req.params.tenantId, req.user.sub);
+    if (!tenant) return res.status(404).json({ error: 'Tenant not found.' });
 
-    // Try to fetch ML overview for this tenant
     let ml_overview = null;
     try {
-      const mlRes = await mlClient.get(`/dashboard/tenants`);
+      const mlRes = await mlClient.get('/dashboard/tenants');
       const tenants = mlRes.data;
-      ml_overview = tenants.find(t => t.tenant_id === tenant.tenant_hash) || null;
+      ml_overview = tenants.find((t) => t.tenant_id === tenant.tenant_hash) || null;
     } catch {
-      // ML might not have this tenant trained yet
+      ml_overview = null;
     }
 
     res.json({ ...tenant, ml_overview });
@@ -50,21 +41,17 @@ router.get('/:tenantId', requireAuth, async (req, res, next) => {
 // POST /api/tenants/:tenantId/train
 router.post('/:tenantId/train', requireAuth, async (req, res, next) => {
   try {
-    const tenantRes = await query(
-      'SELECT id, tenant_hash FROM tenants WHERE id = $1 AND owner_id = $2',
-      [req.params.tenantId, req.user.sub]
-    );
-    if (!tenantRes.rows.length) return res.status(404).json({ error: 'Tenant not found.' });
-    const tenant = tenantRes.rows[0];
+    const tenant = await findTenantByIdForOwner(req.params.tenantId, req.user.sub);
+    if (!tenant) return res.status(404).json({ error: 'Tenant not found.' });
 
     const mlRes = await mlClient.post('/train', {
       tenant_id: tenant.tenant_hash,
       augment: req.body.augment || false,
     });
 
-    await query(
-      'UPDATE tenants SET ml_trained = TRUE, trained_at = NOW() WHERE id = $1',
-      [tenant.id]
+    await Tenant.updateOne(
+      { tenant_key: tenant.id },
+      { $set: { ml_trained: true, trained_at: new Date() } }
     );
     await cacheInvalidateTenant(tenant.id);
 

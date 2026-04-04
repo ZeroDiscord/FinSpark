@@ -59,7 +59,7 @@ async function sendRecommendationToAsana(tenantId, recommendationId, projectId) 
 
   const task = await asanaIntegrationService.createTask(tenantId, {
     recommendation: {
-      feature: recommendation.feature || recommendation.affected_feature,
+      feature: recommendation.source_data?.feature || recommendation.feature || recommendation.title,
       problem: recommendation.problem || recommendation.description,
       suggestion: recommendation.suggestion || recommendation.description,
       priority: recommendation.priority,
@@ -69,7 +69,7 @@ async function sendRecommendationToAsana(tenantId, recommendationId, projectId) 
     sectionId: connection.default_column_gid,
   });
 
-  await markRecommendationAsana(recommendation.id, task.task_gid, task.permalink_url);
+  await markRecommendationAsana(recommendation._id || recommendation.id, task.task_gid, task.permalink_url);
   return task;
 }
 

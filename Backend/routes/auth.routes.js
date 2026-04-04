@@ -4,10 +4,12 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { query } = require('../db/client');
 const config = require('../config');
 const requireAuth = require('../middleware/auth');
 const { hashTenantId } = require('../utils/hashTenantId');
+const { createUser, findUserByEmail, findUserById } = require('../src/models/UserModel');
+const { createTenant } = require('../src/models/TenantModel');
+const RefreshToken = require('../src/database/models/RefreshToken');
 
 function signAccess(payload) {
   return jwt.sign(payload, config.jwt.secret, { expiresIn: config.jwt.expiresIn });
@@ -25,37 +27,36 @@ router.post('/register', async (req, res, next) => {
       return res.status(400).json({ error: 'email, password, and company_name are required.' });
     }
 
-    const existing = await query('SELECT id FROM users WHERE email = $1', [email]);
-    if (existing.rows.length) {
+    const existing = await findUserByEmail(email);
+    if (existing) {
       return res.status(409).json({ error: 'Email already registered.' });
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
-    const userRes = await query(
-      `INSERT INTO users (email, password_hash, full_name) VALUES ($1, $2, $3) RETURNING id`,
-      [email, passwordHash, full_name || null]
-    );
-    const userId = userRes.rows[0].id;
-
     const tenantHash = hashTenantId(company_name);
-    const tenantRes = await query(
-      `INSERT INTO tenants (owner_id, company_name, tenant_hash) VALUES ($1, $2, $3) RETURNING id`,
-      [userId, company_name, tenantHash]
-    );
-    const tenantId = tenantRes.rows[0].id;
+    const tenant = await createTenant({ companyName: company_name, tenantHash });
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await createUser({
+      email,
+      passwordHash,
+      fullName: full_name,
+      tenantId: tenant.tenant_hash,
+    });
 
-    const jwtPayload = { sub: userId, tenant_id: tenantHash, tenant_db_id: tenantId, role: 'admin' };
+    const jwtPayload = { sub: user.id, tenant_id: tenantHash, tenant_db_id: tenant.id, role: 'admin' };
     const token = signAccess(jwtPayload);
-    const refreshToken = signRefresh({ sub: userId });
+    const refreshToken = signRefresh({ sub: user.id });
 
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await query(
-      `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-      [userId, tokenHash, expiresAt]
-    );
+    await RefreshToken.create({ user_id: user.id, token_hash: tokenHash, expires_at: expiresAt });
 
-    res.status(201).json({ user_id: userId, tenant_id: tenantHash, tenant_db_id: tenantId, token, refresh_token: refreshToken });
+    res.status(201).json({
+      user_id: user.id,
+      tenant_id: tenantHash,
+      tenant_db_id: tenant.id,
+      token,
+      refresh_token: refreshToken,
+    });
   } catch (err) {
     next(err);
   }
@@ -69,19 +70,11 @@ router.post('/login', async (req, res, next) => {
       return res.status(400).json({ error: 'email and password are required.' });
     }
 
-    const userRes = await query(
-      `SELECT u.id, u.email, u.password_hash, u.role, t.id AS tenant_db_id, t.tenant_hash
-       FROM users u
-       LEFT JOIN tenants t ON t.owner_id = u.id
-       WHERE u.email = $1
-       LIMIT 1`,
-      [email]
-    );
-    if (!userRes.rows.length) {
+    const user = await findUserByEmail(email);
+    if (!user) {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
-    const user = userRes.rows[0];
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials.' });
 
@@ -96,10 +89,7 @@ router.post('/login', async (req, res, next) => {
 
     const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await query(
-      `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-      [user.id, tokenHash, expiresAt]
-    );
+    await RefreshToken.create({ user_id: user.id, token_hash: tokenHash, expires_at: expiresAt });
 
     res.json({
       token,
@@ -125,21 +115,16 @@ router.post('/refresh', async (req, res, next) => {
     }
 
     const tokenHash = crypto.createHash('sha256').update(refresh_token).digest('hex');
-    const stored = await query(
-      `SELECT id FROM refresh_tokens WHERE token_hash = $1 AND revoked = FALSE AND expires_at > NOW()`,
-      [tokenHash]
-    );
-    if (!stored.rows.length) {
+    const stored = await RefreshToken.findOne({
+      token_hash: tokenHash,
+      revoked: false,
+      expires_at: { $gt: new Date() },
+    }).lean();
+    if (!stored) {
       return res.status(401).json({ error: 'Refresh token revoked or expired.' });
     }
 
-    const userRes = await query(
-      `SELECT u.id, u.role, t.id AS tenant_db_id, t.tenant_hash
-       FROM users u LEFT JOIN tenants t ON t.owner_id = u.id
-       WHERE u.id = $1 LIMIT 1`,
-      [payload.sub]
-    );
-    const user = userRes.rows[0];
+    const user = await findUserById(payload.sub);
     const token = signAccess({
       sub: user.id,
       tenant_id: user.tenant_hash,
@@ -159,7 +144,7 @@ router.post('/logout', requireAuth, async (req, res, next) => {
     const { refresh_token } = req.body;
     if (refresh_token) {
       const tokenHash = crypto.createHash('sha256').update(refresh_token).digest('hex');
-      await query('UPDATE refresh_tokens SET revoked = TRUE WHERE token_hash = $1', [tokenHash]);
+      await RefreshToken.updateOne({ token_hash: tokenHash }, { $set: { revoked: true } });
     }
     res.json({ success: true });
   } catch (err) {

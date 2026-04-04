@@ -2,17 +2,16 @@
 
 const router = require('express').Router();
 const requireAuth = require('../middleware/auth');
-const { query } = require('../db/client');
 const mlClient = require('../services/mlClient');
 const { cacheGet, cacheSet } = require('../services/cacheService');
+const { findTenantByIdForOwner, findTenantByHashForOwner } = require('../src/models/TenantModel');
+const { listFeaturesByTenant } = require('../src/models/DetectedFeatureModel');
 
-// Resolve tenantDbId from route param (UUID) or from JWT
 async function resolveTenant(tenantParam, userId) {
-  const res = await query(
-    `SELECT id, tenant_hash FROM tenants WHERE id = $1 AND owner_id = $2`,
-    [tenantParam, userId]
+  return (
+    (await findTenantByIdForOwner(tenantParam, userId)) ||
+    (await findTenantByHashForOwner(tenantParam, userId))
   );
-  return res.rows[0] || null;
 }
 
 // GET /api/features/:tenantId
@@ -22,26 +21,17 @@ router.get('/:tenantId', requireAuth, async (req, res, next) => {
     if (!tenant) return res.status(404).json({ error: 'Tenant not found.' });
 
     const { source, page = 1, limit = 50 } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const pageNumber = parseInt(page, 10);
+    const pageSize = parseInt(limit, 10);
+    const offset = (pageNumber - 1) * pageSize;
 
-    let sql = `SELECT id, name, l3_feature, l2_module, l1_domain, source_type, confidence, created_at
-               FROM features WHERE tenant_id = $1`;
-    const params = [tenant.id];
+    let features = await listFeaturesByTenant(tenant.id);
+    if (source) features = features.filter((item) => item.source_type === source);
 
-    if (source) {
-      sql += ` AND source_type = $${params.length + 1}`;
-      params.push(source);
-    }
-
-    const countRes = await query(sql.replace(/SELECT .* FROM/, 'SELECT COUNT(*) FROM').split('ORDER')[0], params);
-    sql += ` ORDER BY confidence DESC, created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    params.push(parseInt(limit), offset);
-
-    const dataRes = await query(sql, params);
     res.json({
-      features: dataRes.rows,
-      total: parseInt(countRes.rows[0]?.count || 0),
-      page: parseInt(page),
+      features: features.slice(offset, offset + pageSize),
+      total: features.length,
+      page: pageNumber,
     });
   } catch (err) {
     next(err);

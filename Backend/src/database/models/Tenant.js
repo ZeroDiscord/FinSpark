@@ -13,6 +13,8 @@ const tenantSchema = new mongoose.Schema(
       index: true,
     },
     plan: { type: String, default: 'trial' },
+    ml_trained: { type: Boolean, default: false },
+    trained_at: { type: Date, default: null },
     status: { type: String, enum: ['active', 'suspended', 'archived'], default: 'active', index: true },
     settings: {
       timezone: { type: String, default: 'UTC' },

@@ -81,9 +81,7 @@ async function processCsvUpload({ tenant, file, deploymentType = 'cloud' }) {
   const parsed = await parseCsvFile(file.path);
   await insertUsageEvents(tenant.id, parsed.rows);
 
-  if (UsageEventLog?.db?.readyState === 1) {
-    await UsageEventLog.insertMany(parsed.rows, { ordered: false }).catch(() => null);
-  }
+  await UsageEventLog.insertMany(parsed.rows, { ordered: false }).catch(() => null);
 
   const mlResult = await ingestCsvForMl({
     file_path: path.resolve(file.path),

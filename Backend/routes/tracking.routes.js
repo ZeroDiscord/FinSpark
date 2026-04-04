@@ -2,23 +2,20 @@
 
 const router = require('express').Router();
 const requireAuth = require('../middleware/auth');
-const { query } = require('../db/client');
 const { generateAll, generateJS, generateKotlin, generateDart } = require('../services/codegenService');
+const { findTenantByIdForOwner, findTenantByHashForOwner } = require('../src/models/TenantModel');
+const { listFeaturesByTenant } = require('../src/models/DetectedFeatureModel');
 
 async function resolveTenant(tenantParam, userId) {
-  const res = await query(
-    'SELECT id, tenant_hash FROM tenants WHERE id = $1 AND owner_id = $2',
-    [tenantParam, userId]
+  return (
+    (await findTenantByIdForOwner(tenantParam, userId)) ||
+    (await findTenantByHashForOwner(tenantParam, userId))
   );
-  return res.rows[0] || null;
 }
 
-async function getFeatureNames(tenantDbId) {
-  const res = await query(
-    'SELECT l3_feature FROM features WHERE tenant_id = $1 ORDER BY confidence DESC LIMIT 100',
-    [tenantDbId]
-  );
-  return res.rows.map(r => r.l3_feature);
+async function getFeatureNames(tenantId) {
+  const features = await listFeaturesByTenant(tenantId);
+  return features.slice(0, 100).map((row) => row.l3_feature);
 }
 
 // GET /api/tracking/:tenantId/snippets?lang=js|kotlin|dart
@@ -30,9 +27,9 @@ router.get('/:tenantId/snippets', requireAuth, async (req, res, next) => {
     const features = await getFeatureNames(tenant.id);
     const { lang } = req.query;
 
-    if (lang === 'js')     return res.json({ js: generateJS(features, tenant.tenant_hash) });
+    if (lang === 'js') return res.json({ js: generateJS(features, tenant.tenant_hash) });
     if (lang === 'kotlin') return res.json({ kotlin: generateKotlin(features, tenant.tenant_hash) });
-    if (lang === 'dart')   return res.json({ dart: generateDart(features, tenant.tenant_hash) });
+    if (lang === 'dart') return res.json({ dart: generateDart(features, tenant.tenant_hash) });
 
     res.json(generateAll(features, tenant.tenant_hash));
   } catch (err) {
@@ -50,9 +47,9 @@ router.get('/:tenantId/snippets/:lang/download', requireAuth, async (req, res, n
     const { lang } = req.params;
 
     const map = {
-      js:     { fn: generateJS,     filename: 'track.js',             mime: 'application/javascript' },
-      kotlin: { fn: generateKotlin, filename: 'FeatureTracker.kt',    mime: 'text/plain' },
-      dart:   { fn: generateDart,   filename: 'finspark_tracker.dart', mime: 'text/plain' },
+      js: { fn: generateJS, filename: 'track.js', mime: 'application/javascript' },
+      kotlin: { fn: generateKotlin, filename: 'FeatureTracker.kt', mime: 'text/plain' },
+      dart: { fn: generateDart, filename: 'finspark_tracker.dart', mime: 'text/plain' },
     };
 
     if (!map[lang]) return res.status(400).json({ error: 'lang must be js, kotlin, or dart.' });

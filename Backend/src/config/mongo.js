@@ -7,9 +7,10 @@ const logger = require('../../utils/logger');
 let connected = false;
 
 async function connectMongo() {
-  if (!config.mongo.uri || connected) return;
+  if (connected) return;
 
-  await mongoose.connect(config.mongo.uri, {
+  const uri = config.mongo.uri || 'mongodb://127.0.0.1:27017/finspark';
+  await mongoose.connect(uri, {
     dbName: config.mongo.dbName,
   });
 

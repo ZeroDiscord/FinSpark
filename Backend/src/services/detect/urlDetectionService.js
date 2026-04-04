@@ -42,8 +42,8 @@ async function extractPageSignals(page, url) {
 
 async function crawlPages(startUrl, maxPages = 10, maxDepth = 2) {
   const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'],
   });
 
   const queue = [{ url: startUrl, depth: 0 }];
@@ -86,7 +86,14 @@ async function crawlPages(startUrl, maxPages = 10, maxDepth = 2) {
 async function detectFeaturesFromUrl(url, options = {}) {
   const maxPages = Number(options.max_pages || 10);
   const maxDepth = Number(options.max_depth || 2);
-  const pages = await crawlPages(url, maxPages, maxDepth);
+
+  let pages;
+  try {
+    pages = await crawlPages(url, maxPages, maxDepth);
+  } catch (error) {
+    logger.warn({ event: 'detect_url_crawl_failed', url, error: error.message });
+    pages = [];
+  }
   const rawItems = [];
 
   for (const page of pages) {

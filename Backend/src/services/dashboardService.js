@@ -1,96 +1,105 @@
 'use strict';
 
-const { query } = require('../../db/client');
+const UsageEvent = require('../database/models/UsageEvent');
 const { predictChurnFromEvents } = require('./mlService');
 
 async function getDashboardData({ tenantId, start, end }) {
-  const params = [tenantId];
-  let dateClause = '';
-  if (start) {
-    params.push(start);
-    dateClause += ` AND timestamp >= $${params.length}`;
-  }
-  if (end) {
-    params.push(end);
-    dateClause += ` AND timestamp <= $${params.length}`;
+  const filter = { tenant_id: tenantId };
+  if (start || end) {
+    filter.timestamp = {};
+    if (start) filter.timestamp.$gte = new Date(start);
+    if (end) filter.timestamp.$lte = new Date(end);
   }
 
   const [overview, featureUsage, funnelRows, topDropoffRows] = await Promise.all([
-    query(
-      `SELECT COUNT(DISTINCT session_id) AS total_sessions,
-              COUNT(DISTINCT user_id) AS active_users,
-              COALESCE(AVG(churn_label::decimal), 0) AS churn_rate
-       FROM events
-       WHERE tenant_id = $1${dateClause}`,
-      params
-    ),
-    query(
-      `SELECT l3_feature AS feature, COUNT(*)::int AS usage_count,
-              COALESCE(AVG(churn_label::decimal), 0) AS churn_rate
-       FROM events
-       WHERE tenant_id = $1${dateClause}
-       GROUP BY l3_feature
-       ORDER BY usage_count DESC`,
-      params
-    ),
-    query(
-      `SELECT l3_feature AS feature, COUNT(DISTINCT session_id)::int AS sessions
-       FROM events
-       WHERE tenant_id = $1${dateClause}
-       GROUP BY l3_feature
-       ORDER BY sessions DESC
-       LIMIT 5`,
-      params
-    ),
-    query(
-      `SELECT l3_feature AS feature,
-              COUNT(*)::int AS usage_count,
-              COALESCE(AVG(churn_label::decimal), 0) AS drop_off_rate
-       FROM events
-       WHERE tenant_id = $1${dateClause}
-       GROUP BY l3_feature
-       ORDER BY drop_off_rate DESC, usage_count DESC
-       LIMIT 10`,
-      params
-    ),
+    UsageEvent.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          total_sessions: { $addToSet: '$session_id' },
+          active_users: { $addToSet: '$user_id' },
+          churn_values: { $push: { $ifNull: ['$churn_label', 0] } },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          total_sessions: { $size: '$total_sessions' },
+          active_users: { $size: '$active_users' },
+          churn_rate: { $avg: '$churn_values' },
+        },
+      },
+    ]),
+    UsageEvent.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: '$l3_feature',
+          usage_count: { $sum: 1 },
+          churn_rate: { $avg: { $ifNull: ['$churn_label', 0] } },
+        },
+      },
+      { $sort: { usage_count: -1 } },
+      { $project: { _id: 0, feature: '$_id', usage_count: 1, churn_rate: 1 } },
+    ]),
+    UsageEvent.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: '$l3_feature',
+          sessions: { $addToSet: '$session_id' },
+        },
+      },
+      { $project: { _id: 0, feature: '$_id', sessions: { $size: '$sessions' } } },
+      { $sort: { sessions: -1 } },
+      { $limit: 5 },
+    ]),
+    UsageEvent.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: '$l3_feature',
+          usage_count: { $sum: 1 },
+          drop_off_rate: { $avg: { $ifNull: ['$churn_label', 0] } },
+        },
+      },
+      { $sort: { drop_off_rate: -1, usage_count: -1 } },
+      { $limit: 10 },
+      { $project: { _id: 0, feature: '$_id', usage_count: 1, drop_off_rate: 1 } },
+    ]),
   ]);
 
-  const totalSessions = Number(overview.rows[0]?.total_sessions || 0);
-  const activeUsers = Number(overview.rows[0]?.active_users || 0);
-  const churnRate = Number(overview.rows[0]?.churn_rate || 0);
+  const stats = overview[0] || { total_sessions: 0, active_users: 0, churn_rate: 0 };
 
   return {
-    total_sessions: totalSessions,
-    active_users: activeUsers,
-    churn_rate: churnRate,
-    feature_usage: featureUsage.rows.map((row) => ({
+    total_sessions: Number(stats.total_sessions || 0),
+    active_users: Number(stats.active_users || 0),
+    churn_rate: Number(stats.churn_rate || 0),
+    feature_usage: featureUsage.map((row) => ({
       feature: row.feature,
       usage_count: Number(row.usage_count),
-      churn_rate: Number(row.churn_rate),
+      churn_rate: Number(row.churn_rate || 0),
     })),
-    funnel: funnelRows.rows.map((row) => ({
+    funnel: funnelRows.map((row) => ({
       step: row.feature,
       count: Number(row.sessions),
     })),
-    top_drop_off_features: topDropoffRows.rows.map((row) => ({
+    top_drop_off_features: topDropoffRows.map((row) => ({
       feature: row.feature,
       usage_count: Number(row.usage_count),
-      drop_off_rate: Number(row.drop_off_rate),
+      drop_off_rate: Number(row.drop_off_rate || 0),
     })),
   };
 }
 
 async function predictLatestSessionChurn(tenantId) {
-  const result = await query(
-    `SELECT session_id, l3_feature, duration_ms, success, timestamp
-     FROM events
-     WHERE tenant_id = $1
-     ORDER BY timestamp DESC
-     LIMIT 20`,
-    [tenantId]
-  );
-  if (!result.rows.length) return null;
-  return predictChurnFromEvents(result.rows);
+  const events = await UsageEvent.find({ tenant_id: tenantId })
+    .sort({ timestamp: -1 })
+    .limit(20)
+    .lean();
+  if (!events.length) return null;
+  return predictChurnFromEvents(events);
 }
 
 module.exports = { getDashboardData, predictLatestSessionChurn };

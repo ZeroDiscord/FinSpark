@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 const config = require('../config/env');
 const { createUser, findUserByEmail, findUserById } = require('../models/UserModel');
 const { createTenant } = require('../models/TenantModel');
-const { query } = require('../../db/client');
+const RefreshToken = require('../database/models/RefreshToken');
 const { hashTenantId } = require('../../utils/hashTenantId');
 const { ValidationError, UnauthorizedError } = require('../utils/errors');
 
@@ -21,10 +21,11 @@ function signRefresh(payload) {
 async function persistRefreshToken(userId, refreshToken) {
   const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await query(
-    `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-    [userId, tokenHash, expiresAt]
-  );
+  await RefreshToken.create({
+    user_id: userId,
+    token_hash: tokenHash,
+    expires_at: expiresAt,
+  });
 }
 
 async function register(req, res) {
@@ -36,12 +37,16 @@ async function register(req, res) {
   const existing = await findUserByEmail(email);
   if (existing) throw new ValidationError('Email already registered.');
 
-  const passwordHash = await bcrypt.hash(password, 12);
-  const user = await createUser({ email, passwordHash, fullName: full_name });
   const tenant = await createTenant({
-    ownerId: user.id,
     companyName: company_name,
     tenantHash: hashTenantId(company_name),
+  });
+  const passwordHash = await bcrypt.hash(password, 12);
+  const user = await createUser({
+    email,
+    passwordHash,
+    fullName: full_name,
+    tenantId: tenant.tenant_hash,
   });
 
   const payload = { sub: user.id, tenant_id: tenant.tenant_hash, tenant_db_id: tenant.id, role: 'admin' };

@@ -1,13 +1,15 @@
 'use strict';
 
-const { findTenantByIdForOwner } = require('../models/TenantModel');
+const { findTenantByIdForOwner, findTenantByHashForOwner } = require('../models/TenantModel');
 const { processApkUpload, processWebsiteSubmission } = require('../services/uploadService');
 const { getDetectionByUploadId } = require('../services/featureService');
 const { ValidationError, NotFoundError } = require('../utils/errors');
 
 async function resolveTenant(req) {
   const tenantId = req.body.tenant_db_id || req.body.tenant_id || req.user.tenant_db_id;
-  const tenant = await findTenantByIdForOwner(tenantId, req.user.sub);
+  const tenant =
+    (await findTenantByIdForOwner(tenantId, req.user.sub)) ||
+    (await findTenantByHashForOwner(tenantId, req.user.sub));
   if (!tenant) throw new NotFoundError('Tenant not found.');
   return tenant;
 }

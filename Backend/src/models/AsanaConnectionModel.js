@@ -1,13 +1,9 @@
 'use strict';
 
-const { query } = require('../../db/client');
+const { AsanaConnection } = require('../database/models');
 
 async function getAsanaConnection(tenantId) {
-  const result = await query(
-    `SELECT * FROM asana_connections WHERE tenant_id = $1 LIMIT 1`,
-    [tenantId]
-  );
-  return result.rows[0] || null;
+  return AsanaConnection.findOne({ tenant_id: tenantId }).lean();
 }
 
 module.exports = { getAsanaConnection };
