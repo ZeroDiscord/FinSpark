@@ -1,0 +1,21 @@
+# Final Submission Checklist
+
+- Frontend builds successfully
+- Backend starts with valid environment variables
+- ML service is reachable
+- MongoDB is connected
+- PostgreSQL is connected or safely optional
+- Docker Compose boots locally
+- Demo seed data is loaded
+- Dashboard visuals are populated
+- Recommendation cards are populated
+- Asana OAuth is tested
+- Asana workspace/project/section mapping is saved
+- Single recommendation send works
+- Bulk recommendation send works
+- Power BI CSV export works
+- Power BI JSON export works
+- README is updated
+- Secrets are removed from the repo
+- Pitch is practiced
+- Backup demo video is recorded

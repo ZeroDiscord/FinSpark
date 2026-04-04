@@ -4,6 +4,7 @@ const { query } = require('../../../db/client');
 const { sanitizeMetadata } = require('./sanitizer');
 const { normalizeEvent } = require('./validator');
 const UsageEvent = require('../../database/models/UsageEvent');
+const { maybePredictRealtimeForEvents } = require('../ml/predictionIntegrationService');
 
 async function insertEventRow(event) {
   await query(
@@ -49,6 +50,7 @@ async function ingestEvents(payload) {
 
   if (UsageEvent?.db?.readyState === 1) {
     await UsageEvent.insertMany(events, { ordered: false }).catch(() => null);
+    await maybePredictRealtimeForEvents(events).catch(() => null);
   }
 
   return {

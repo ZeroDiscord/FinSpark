@@ -10,6 +10,7 @@ export function useRecommendations(tenantId, params) {
 
   useEffect(() => {
     if (!tenantId) return
+    setState((current) => ({ ...current, isLoading: true, error: '' }))
     fetchRecommendations(tenantId, params)
       .then((recommendations) =>
         setState({ recommendations, isLoading: false, error: '' }),

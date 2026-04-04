@@ -2,7 +2,8 @@
 
 const { getDashboardData } = require('./dashboardService');
 const { createRecommendation, findRecommendationById, listRecommendations, markRecommendationAsana } = require('../models/RecommendationModel');
-const legacyAsanaService = require('../../services/asanaService');
+const asanaIntegrationService = require('./asanaIntegrationService');
+const { getRecommendationCards } = require('./analytics/recommendationEngineService');
 const { AsanaConnectionMissingError, NotFoundError } = require('../utils/errors');
 
 function buildRecommendationsFromDashboard(dashboard) {
@@ -22,6 +23,9 @@ function buildRecommendationsFromDashboard(dashboard) {
 }
 
 async function getOrCreateRecommendations(tenant) {
+  const analyticsRecommendations = await getRecommendationCards(tenant.id).catch(() => []);
+  if (analyticsRecommendations.length) return analyticsRecommendations;
+
   const existing = await listRecommendations(tenant.id);
   if (existing.length) {
     return existing.map((item) => ({
@@ -50,12 +54,19 @@ async function sendRecommendationToAsana(tenantId, recommendationId, projectId) 
   const recommendation = await findRecommendationById(tenantId, recommendationId);
   if (!recommendation) throw new NotFoundError('Recommendation not found.');
 
-  const connection = await legacyAsanaService.getConnection(tenantId);
+  const connection = await asanaIntegrationService.getConnection(tenantId);
   if (!connection) throw new AsanaConnectionMissingError();
 
-  const task = await legacyAsanaService.createTask(tenantId, {
-    ...recommendation,
-    project_gid: projectId || connection.workspace_gid,
+  const task = await asanaIntegrationService.createTask(tenantId, {
+    recommendation: {
+      feature: recommendation.feature || recommendation.affected_feature,
+      problem: recommendation.problem || recommendation.description,
+      suggestion: recommendation.suggestion || recommendation.description,
+      priority: recommendation.priority,
+      metrics: recommendation.metrics || {},
+    },
+    projectId: projectId || connection.project_gid,
+    sectionId: connection.default_column_gid,
   });
 
   await markRecommendationAsana(recommendation.id, task.task_gid, task.permalink_url);

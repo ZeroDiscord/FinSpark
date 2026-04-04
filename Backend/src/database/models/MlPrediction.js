@@ -7,6 +7,7 @@ const mlPredictionSchema = new mongoose.Schema(
     tenant_id: { type: String, required: true, index: true },
     session_id: { type: String, required: true, index: true },
     processed_session_id: { type: mongoose.Schema.Types.ObjectId, ref: 'ProcessedSession', index: true },
+    analysis_run_id: { type: mongoose.Schema.Types.ObjectId, ref: 'AnalysisRun', index: true },
     model_name: { type: String, required: true },
     model_version: { type: String, required: true },
     churn_probability: { type: Number, required: true, index: true },

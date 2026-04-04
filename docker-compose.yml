@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:3001/api
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./Backend/.env.example
+    environment:
+      PORT: 3001
+      FRONTEND_URL: http://localhost:5173
+      ML_BASE_URL: http://ml-service:8000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/finspark
+      MONGO_URI: mongodb://mongodb:27017
+      MONGO_DB_NAME: finspark
+    volumes:
+      - ./uploads:/app/uploads
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+      - mongodb
+      - ml-service
+
+  ml-service:
+    build:
+      context: ./ML
+      dockerfile: Dockerfile
+    env_file:
+      - ./ML/.env.example
+    environment:
+      API_KEY: dev-secret-key
+    ports:
+      - "8000:8000"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: finspark
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
+volumes:
+  pgdata:
+  mongodata:

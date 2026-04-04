@@ -5,6 +5,7 @@ import {
   fetchDropoffTable,
   fetchFeatureUsage,
   fetchFunnel,
+  fetchJourneys,
   fetchTrendSeries,
 } from '../services/dashboardService.js'
 
@@ -12,8 +13,9 @@ export function useDashboardData(tenantId, filters) {
   const [state, setState] = useState({
     overview: null,
     featureUsage: [],
-    heatmap: [],
-    funnel: [],
+    churn: null,
+    funnel: null,
+    journeys: null,
     trend: null,
     dropoffRows: [],
     isLoading: true,
@@ -26,19 +28,21 @@ export function useDashboardData(tenantId, filters) {
     setState((current) => ({ ...current, isLoading: true, error: '' }))
 
     Promise.allSettled([
-      fetchDashboardOverview(tenantId),
-      fetchFeatureUsage(tenantId),
-      fetchChurnHeatmap(tenantId),
-      fetchFunnel(tenantId),
-      fetchTrendSeries(tenantId),
-      fetchDropoffTable(tenantId),
-    ]).then(([overview, featureUsage, heatmap, funnel, trend, dropoffRows]) => {
+      fetchDashboardOverview(tenantId, filters),
+      fetchFeatureUsage(tenantId, filters),
+      fetchChurnHeatmap(tenantId, filters),
+      fetchFunnel(tenantId, filters),
+      fetchTrendSeries(tenantId, filters),
+      fetchDropoffTable(tenantId, filters),
+      fetchJourneys(tenantId, filters),
+    ]).then(([overview, featureUsage, churn, funnel, trend, dropoffRows, journeys]) => {
       if (cancelled) return
       setState({
         overview: overview.status === 'fulfilled' ? overview.value : null,
         featureUsage: featureUsage.status === 'fulfilled' ? featureUsage.value : [],
-        heatmap: heatmap.status === 'fulfilled' ? heatmap.value : [],
-        funnel: funnel.status === 'fulfilled' ? funnel.value : [],
+        churn: churn.status === 'fulfilled' ? churn.value : null,
+        funnel: funnel.status === 'fulfilled' ? funnel.value : null,
+        journeys: journeys.status === 'fulfilled' ? journeys.value : null,
         trend: trend.status === 'fulfilled' ? trend.value : null,
         dropoffRows: dropoffRows.status === 'fulfilled' ? dropoffRows.value : [],
         isLoading: false,

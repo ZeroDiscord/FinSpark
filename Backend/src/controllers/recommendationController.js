@@ -1,7 +1,11 @@
 'use strict';
 
 const { findTenantByHashForOwner, findTenantByIdForOwner } = require('../models/TenantModel');
-const { getOrCreateRecommendations, sendRecommendationToAsana } = require('../services/recommendationService');
+const { sendRecommendationToAsana } = require('../services/recommendationService');
+const {
+  getRecommendationCards,
+  dismissRecommendation,
+} = require('../services/analytics/recommendationEngineService');
 const { NotFoundError } = require('../utils/errors');
 
 async function resolveTenant(req) {
@@ -15,16 +19,21 @@ async function resolveTenant(req) {
 
 async function list(req, res) {
   const tenant = await resolveTenant(req);
-  const recommendations = await getOrCreateRecommendations(tenant);
-  return res.json(recommendations.map((item) => ({
-    id: item.id,
-    feature: item.feature || item.affected_feature,
-    feature_name: item.feature || item.affected_feature,
-    problem: item.problem || item.description,
-    suggestion: item.suggestion || item.description,
-    priority: item.priority,
-    churn_score: item.source_data?.drop_off_rate || 0.72,
-  })));
+  const recommendations = await getRecommendationCards(tenant.id, {
+    start: req.query.start,
+    end: req.query.end,
+    priority: req.query.priority,
+    category: req.query.category,
+    status: req.query.status,
+    refresh: req.query.refresh,
+  });
+  return res.json(recommendations);
+}
+
+async function dismiss(req, res) {
+  const tenant = await resolveTenant(req);
+  const success = await dismissRecommendation(tenant.id, req.params.id);
+  return res.json({ success });
 }
 
 async function sendToAsana(req, res) {
@@ -37,4 +46,4 @@ async function sendToAsana(req, res) {
   return res.json(task);
 }
 
-module.exports = { list, sendToAsana };
+module.exports = { list, dismiss, sendToAsana };

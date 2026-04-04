@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import Button from '../ui/Button.jsx'
 import { Card, CardContent } from '../ui/Card.jsx'
 
-export default function AsanaConnectionBanner() {
+export default function AsanaConnectionBanner({ tenantId }) {
   return (
     <Card>
       <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -12,7 +12,7 @@ export default function AsanaConnectionBanner() {
             Sync recommendations directly into your delivery backlog and assign them to teams.
           </p>
         </div>
-        <Link to="/app/asana">
+        <Link to={tenantId ? `/app/asana?tenant_id=${tenantId}` : '/app/asana'}>
           <Button>Connect Asana</Button>
         </Link>
       </CardContent>

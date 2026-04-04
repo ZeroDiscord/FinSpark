@@ -7,7 +7,7 @@ export default function OverviewStatsRow({ overview, featureCount = 0 }) {
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       <StatsCard
         title="Total Sessions"
-        value={formatNumber(overview?.n_sessions)}
+        value={formatNumber(overview?.total_sessions || overview?.n_sessions)}
         delta="Tracked across active workspaces"
         icon={Activity}
       />
@@ -19,7 +19,7 @@ export default function OverviewStatsRow({ overview, featureCount = 0 }) {
       />
       <StatsCard
         title="Features Used"
-        value={formatNumber(featureCount)}
+        value={formatNumber(overview?.total_features_used || featureCount)}
         delta="Mapped and activated"
         icon={BarChart3}
       />

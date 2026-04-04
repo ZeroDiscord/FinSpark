@@ -36,19 +36,19 @@ export default function RecommendationCard({
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
             <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Churn score</div>
             <div className="mt-2 text-2xl font-semibold text-white">
-              {Math.round((recommendation.churn_score || recommendation.score || 0.72) * 100)}%
+              {Math.round((recommendation.churn_score || recommendation.score || 0) * 100)}%
             </div>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Suggested action</div>
-            <div className="mt-2 text-sm text-slate-300">
-              {recommendation.suggestion || recommendation.action || 'Reorder the step to reduce abandonment.'}
+            <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Impact score</div>
+            <div className="mt-2 text-2xl font-semibold text-white">
+              {Math.round(recommendation.impact_score || 0)}
             </div>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Impact</div>
+            <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Category</div>
             <div className="mt-2 text-sm text-slate-300">
-              {recommendation.impact || 'High-value user flow at risk'}
+              {recommendation.category || 'analytics'}
             </div>
           </div>
         </div>

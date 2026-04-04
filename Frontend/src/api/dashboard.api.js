@@ -1,14 +1,29 @@
 import client from './client.js'
 
-const base = (id) => `/dashboard/${id}`
+function withTenant(tenantId, params = {}) {
+  return {
+    ...params,
+    tenant_id: tenantId,
+  }
+}
 
-export const getOverview         = (id)      => client.get(`${base(id)}/overview`).then(r => r.data)
-export const getHeatmap          = (id)      => client.get(`${base(id)}/heatmap`).then(r => r.data)
-export const getFunnel           = (id)      => client.get(`${base(id)}/funnel`).then(r => r.data)
-export const getChurnDistribution= (id)      => client.get(`${base(id)}/churn-distribution`).then(r => r.data)
-export const getDashFriction     = (id)      => client.get(`${base(id)}/friction`).then(r => r.data)
-export const getFeatureUsage     = (id)      => client.get(`${base(id)}/feature-usage`).then(r => r.data)
-export const getSegmentation     = (id)      => client.get(`${base(id)}/segmentation`).then(r => r.data)
-export const getSessions         = (id, limit) => client.get(`${base(id)}/sessions`, { params: { limit } }).then(r => r.data)
-export const getInsight          = (id, question) => client.get(`${base(id)}/insight`, { params: { question } }).then(r => r.data)
-export const getTransitionMatrix = (id)      => client.get(`${base(id)}/transition-matrix`).then(r => r.data)
+export const getKpis = (tenantId, params) =>
+  client.get('/dashboard/kpis', { params: withTenant(tenantId, params) }).then((r) => r.data)
+
+export const getFeatureUsage = (tenantId, params) =>
+  client.get('/dashboard/feature-usage', { params: withTenant(tenantId, params) }).then((r) => r.data)
+
+export const getChurn = (tenantId, params) =>
+  client.get('/dashboard/churn', { params: withTenant(tenantId, params) }).then((r) => r.data)
+
+export const getFunnel = (tenantId, params) =>
+  client.get('/dashboard/funnel', { params: withTenant(tenantId, params) }).then((r) => r.data)
+
+export const getJourneys = (tenantId, params) =>
+  client.get('/dashboard/journeys', { params: withTenant(tenantId, params) }).then((r) => r.data)
+
+export const getTimeInsights = (tenantId, params) =>
+  client.get('/dashboard/time-insights', { params: withTenant(tenantId, params) }).then((r) => r.data)
+
+export const getTenantComparison = (params) =>
+  client.get('/dashboard/tenant-comparison', { params }).then((r) => r.data)

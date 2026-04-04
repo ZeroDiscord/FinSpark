@@ -5,6 +5,7 @@ const config = require('./config');
 const logger = require('./utils/logger');
 const fs = require('fs');
 const { connectMongo } = require('./src/config/mongo');
+const { startRetrainScheduler } = require('./src/scheduler/retrainScheduler');
 
 // Ensure upload directories exist
 const dirs = [config.uploads.apkDir, config.uploads.csvDir];
@@ -15,6 +16,7 @@ dirs.forEach(d => {
 async function start() {
   try {
     await connectMongo();
+    startRetrainScheduler();
     app.listen(config.port, () => {
       logger.info({
         event: 'server_started',

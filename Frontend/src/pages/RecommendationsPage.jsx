@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { RefreshCcw, Sparkles } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import AsanaConnectionBanner from '../components/recommendations/AsanaConnectionBanner.jsx'
@@ -15,11 +15,13 @@ import { useAsanaIntegration } from '../hooks/useAsanaIntegration.js'
 export default function RecommendationsPage() {
   const { tenantId } = useParams()
   const { priorityFilter, setPriorityFilter, search, setSearch } = useRecommendationStore()
+  const [refreshKey, setRefreshKey] = useState(0)
   const params = useMemo(() => ({
     priority: priorityFilter === 'all' ? undefined : priorityFilter,
-  }), [priorityFilter])
+    refresh: refreshKey ? 'true' : undefined,
+  }), [priorityFilter, refreshKey])
   const { recommendations, isLoading, error } = useRecommendations(tenantId, params)
-  const { status, projects } = useAsanaIntegration()
+  const { status, projects } = useAsanaIntegration(tenantId)
 
   const filtered = useMemo(() => {
     return recommendations.filter((item) => {
@@ -34,14 +36,14 @@ export default function RecommendationsPage() {
   }, [priorityFilter, recommendations, search])
 
   async function handleSendToKanban(recommendationId) {
-    const projectId = projects[0]?.id
+    const projectId = status?.project_id || projects[0]?.id
     if (!projectId) return
-    await sendRecommendationToKanban({ recommendationId, projectId })
+    await sendRecommendationToKanban({ tenantId, recommendationId, projectId })
   }
 
   async function handleDismiss(recommendationId) {
     await dismissRecommendation(tenantId, recommendationId)
-    window.location.reload()
+    setRefreshKey((value) => value + 1)
   }
 
   return (
@@ -51,13 +53,13 @@ export default function RecommendationsPage() {
         title="Turn churn signals into action"
         description="Prioritize the biggest drop-off features, turn recommendations into Kanban work, and keep product teams aligned with model output."
         actions={
-          <Button variant="secondary" className="gap-2">
+          <Button variant="secondary" className="gap-2" onClick={() => setRefreshKey((value) => value + 1)}>
             <RefreshCcw className="h-4 w-4" />
             Refresh
           </Button>
         }
       />
-      {!status?.connected ? <AsanaConnectionBanner /> : null}
+      {!status?.connected ? <AsanaConnectionBanner tenantId={tenantId} /> : null}
       <div className="flex flex-col gap-3 md:flex-row">
         <input
           value={search}
@@ -92,7 +94,7 @@ export default function RecommendationsPage() {
             <RecommendationCard
               key={recommendation.id}
               recommendation={recommendation}
-              asanaConnected={status?.connected}
+              asanaConnected={Boolean(status?.connected && status?.project_id && status?.section_id)}
               onSendToKanban={handleSendToKanban}
               onDismiss={handleDismiss}
             />

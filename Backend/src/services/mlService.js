@@ -13,6 +13,32 @@ const mlApi = axios.create({
   },
 });
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function postWithRetry(path, payload, options = {}) {
+  const retries = options.retries ?? 2;
+  const retryDelayMs = options.retryDelayMs ?? 1000;
+
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await mlApi.post(path, payload, {
+        timeout: options.timeout ?? 30000,
+      });
+      return response.data;
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries) {
+        await sleep(retryDelayMs * (attempt + 1));
+      }
+    }
+  }
+
+  throw new MlServiceUnavailableError(lastError?.response?.data || lastError?.message);
+}
+
 function buildFeatureSequencePayload(events) {
   const ordered = [...events].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   return {
@@ -25,8 +51,15 @@ function buildFeatureSequencePayload(events) {
 async function predictChurnFromEvents(events) {
   try {
     const payload = buildFeatureSequencePayload(events);
-    const response = await mlApi.post('/predict', payload);
-    return response.data;
+    return await postWithRetry('/predict', payload, { timeout: 30000, retries: 2 });
+  } catch (error) {
+    throw new MlServiceUnavailableError(error.response?.data || error.message);
+  }
+}
+
+async function predictChurnFromSession(sessionPayload) {
+  try {
+    return await postWithRetry('/predict', sessionPayload, { timeout: 30000, retries: 2 });
   } catch (error) {
     throw new MlServiceUnavailableError(error.response?.data || error.message);
   }
@@ -34,12 +67,19 @@ async function predictChurnFromEvents(events) {
 
 async function ingestCsvForMl({ file_path, tenant_id, deployment_type }) {
   try {
-    const response = await mlApi.post('/ingest', {
+    return await postWithRetry('/ingest', {
       file_path,
       tenant_id,
       deployment_type,
-    });
-    return response.data;
+    }, { timeout: 120000, retries: 1 });
+  } catch (error) {
+    throw new MlServiceUnavailableError(error.response?.data || error.message);
+  }
+}
+
+async function triggerModelRetrain(payload) {
+  try {
+    return await postWithRetry('/retrain', payload, { timeout: 120000, retries: 1 });
   } catch (error) {
     throw new MlServiceUnavailableError(error.response?.data || error.message);
   }
@@ -48,6 +88,9 @@ async function ingestCsvForMl({ file_path, tenant_id, deployment_type }) {
 module.exports = {
   buildFeatureSequencePayload,
   predictChurnFromEvents,
+  predictChurnFromSession,
   ingestCsvForMl,
+  triggerModelRetrain,
+  postWithRetry,
   mlApi,
 };

@@ -43,6 +43,15 @@ const config = {
     tokenEncryptionKey: process.env.ASANA_TOKEN_ENCRYPTION_KEY || '0'.repeat(64),
   },
 
+  powerbi: {
+    tenantId: process.env.POWERBI_TENANT_ID || '',
+    clientId: process.env.POWERBI_CLIENT_ID || '',
+    clientSecret: process.env.POWERBI_CLIENT_SECRET || '',
+    workspaceId: process.env.POWERBI_WORKSPACE_ID || '',
+    datasetId: process.env.POWERBI_DATASET_ID || '',
+    tableName: process.env.POWERBI_TABLE_NAME || 'FeatureIntelligence',
+  },
+
   piiSalt: process.env.PII_SALT || 'CHANGE_ME',
 
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',

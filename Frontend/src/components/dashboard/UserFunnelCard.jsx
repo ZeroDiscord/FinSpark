@@ -3,7 +3,8 @@ import ChartContainer from '../ui/ChartContainer.jsx'
 export default function UserFunnelCard({ data, loading, error }) {
   const steps = (data || []).slice(0, 5).map((item, index) => ({
     label: item.feature || item.step || item.l3_feature || `Step ${index + 1}`,
-    value: Number(item.count || item.sessions || item.users || 0) || (5 - index) * 24,
+    value: Number(item.count || item.sessions || item.users || 0),
+    dropOff: Number(item.drop_off_percentage || 0),
   }))
 
   const peak = Math.max(...steps.map((step) => step.value), 1)
@@ -31,7 +32,7 @@ export default function UserFunnelCard({ data, loading, error }) {
             </div>
             {index < steps.length - 1 ? (
               <div className="text-xs text-slate-500">
-                Drop to next step: {Math.max(0, Math.round(((step.value - steps[index + 1].value) / peak) * 100))}%
+                Drop to next step: {Math.max(0, Math.round(step.dropOff || 0))}%
               </div>
             ) : null}
           </div>
