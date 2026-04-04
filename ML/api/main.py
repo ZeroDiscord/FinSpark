@@ -142,7 +142,7 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Dashboard router
 # ---------------------------------------------------------------------------
-from ML.api.dashboard import router as dashboard_router
+from .dashboard import router as dashboard_router
 app.include_router(dashboard_router)
 
 
