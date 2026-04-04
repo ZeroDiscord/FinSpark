@@ -3,24 +3,24 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const path = require('path');
+const morgan = require('morgan');
 
 const config = require('./config');
 const logger = require('./utils/logger');
-const errorHandler = require('./middleware/errorHandler');
 const rateLimiter = require('./middleware/rateLimiter');
+const { errorHandler } = require('./src/middleware/errorHandler');
 
 // Routes
-const authRoutes = require('./routes/auth.routes');
+const authRoutes = require('./src/routes/auth.routes');
 const tenantRoutes = require('./routes/tenant.routes');
-const uploadRoutes = require('./routes/upload.routes');
-const featuresRoutes = require('./routes/features.routes');
-const trackingRoutes = require('./routes/tracking.routes');
-const dashboardRoutes = require('./routes/dashboard.routes');
+const uploadRoutes = require('./src/routes/upload.routes');
+const featuresRoutes = require('./src/routes/features.routes');
+const trackingRoutes = require('./src/routes/tracking.routes');
+const dashboardRoutes = require('./src/routes/dashboard.routes');
 const predictRoutes = require('./routes/predict.routes');
-const recommendRoutes = require('./routes/recommend.routes');
-const asanaRoutes = require('./routes/asana.routes');
-const exportRoutes = require('./routes/export.routes');
+const recommendRoutes = require('./src/routes/recommendation.routes');
+const asanaRoutes = require('./src/routes/asana.routes');
+const exportRoutes = require('./src/routes/export.routes');
 
 const app = express();
 
@@ -45,6 +45,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/', rateLimiter);
 
 // Request logging
+app.use(morgan(config.nodeEnv === 'production' ? 'combined' : 'dev'));
 app.use((req, _res, next) => {
   logger.debug({ method: req.method, path: req.path, ip: req.ip });
   next();
