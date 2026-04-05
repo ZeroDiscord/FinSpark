@@ -20,7 +20,6 @@ const tenantSchema = new mongoose.Schema(
       timezone: { type: String, default: 'UTC' },
       retention_days: { type: Number, default: 180 },
       dashboard_cache_ttl_seconds: { type: Number, default: 300 },
-      tracking_consent: { type: Boolean, default: true },
     },
   },
   { collection: 'tenants', timestamps: true }

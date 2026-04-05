@@ -52,25 +52,6 @@ export default function SettingsPage() {
             <Button variant="destructive">Reset workspace preferences</Button>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="space-y-4">
-            <div className="text-lg font-semibold text-white">Governance & Consent</div>
-            <p className="text-sm text-slate-400">Configure telemetry collection and view audit logs.</p>
-            <label className="flex items-center justify-between rounded-3xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-slate-300">
-              Enable Telemetry Tracking
-              <input type="checkbox" defaultChecked />
-            </label>
-            <div className="mt-4 rounded-xl border border-white/10 bg-slate-900/50 p-4">
-              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Recent Audit Logs</div>
-              <div className="space-y-2 text-xs text-slate-400">
-                <div className="flex justify-between border-b border-white/5 pb-1">
-                  <span>admin@finspark.com</span>
-                  <span>Enabled tracking</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </div>
   )
