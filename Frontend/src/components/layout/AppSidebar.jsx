@@ -6,6 +6,7 @@ import {
   Database,
   GitBranchPlus,
   LayoutGrid,
+  Network,
   Sparkles,
   Upload,
   Workflow,
@@ -19,7 +20,7 @@ const navItems = [
   { label: 'Features',        icon: Boxes,          base: '/app/features' },
   { label: 'Tracking',        icon: Workflow,       base: '/app/tracking' },
   { label: 'Dataset',         icon: Database,       base: '/app/dataset' },
-  { label: 'Train',           icon: Brain,          base: '/app/train' },
+  { label: 'Intelligence',    icon: Network,        base: '/app/intelligence' },
   { label: 'Recommendations', icon: Sparkles,       base: '/app/recommendations' },
   { label: 'Asana',           icon: GitBranchPlus,  base: '/app/asana' },
   { label: 'Settings',        icon: Cog,            base: '/app/settings' },
@@ -27,7 +28,7 @@ const navItems = [
 
 export function resolveTenantPath(base, tenantId) {
   if (!tenantId) return base
-  if (['/app/features', '/app/tracking', '/app/dashboard', '/app/dataset', '/app/train', '/app/recommendations'].includes(base)) {
+  if (['/app/features', '/app/tracking', '/app/dashboard', '/app/dataset', '/app/recommendations', '/app/intelligence'].includes(base)) {
     return `${base}/${tenantId}`
   }
   return base

@@ -70,24 +70,32 @@ export default function RecommendationsPage() {
         }
       />
       {!status?.connected ? <AsanaConnectionBanner tenantId={tenantId} /> : null}
-      <div className="flex flex-col gap-3 md:flex-row">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search recommendations"
-          className="h-12 flex-1 rounded-3xl border border-white/10 bg-slate-950/70 px-4 text-sm text-white outline-none"
+          placeholder="Search recommendations…"
+          className="h-11 flex-1 rounded-3xl border border-white/10 bg-slate-950/70 px-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-white/20"
         />
-        <select
-          value={priorityFilter}
-          onChange={(event) => setPriorityFilter(event.target.value)}
-          className="h-12 rounded-3xl border border-white/10 bg-slate-950/70 px-4 text-sm text-white outline-none"
-        >
-          <option value="all">All priorities</option>
-          <option value="critical">Critical</option>
-          <option value="high">High</option>
-          <option value="medium">Medium</option>
-          <option value="low">Low</option>
-        </select>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { value: 'all',      label: 'All',      classes: 'border-white/15 text-slate-400 hover:border-white/25 hover:text-white',                          active: 'border-white/30 bg-white/8 text-white' },
+            { value: 'critical', label: 'Critical',  classes: 'border-rose-500/30 text-rose-400/70 hover:border-rose-500/60 hover:text-rose-300',               active: 'border-rose-500/60 bg-rose-500/20 text-rose-300 shadow-[0_0_12px_rgba(244,63,94,0.2)]' },
+            { value: 'high',     label: 'High',      classes: 'border-amber-400/30 text-amber-400/70 hover:border-amber-400/60 hover:text-amber-300',           active: 'border-amber-400/60 bg-amber-500/20 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.15)]' },
+            { value: 'medium',   label: 'Medium',    classes: 'border-cyan-400/30 text-cyan-400/70 hover:border-cyan-400/60 hover:text-cyan-300',               active: 'border-cyan-400/50 bg-cyan-500/15 text-cyan-300' },
+            { value: 'low',      label: 'Low',       classes: 'border-emerald-400/25 text-emerald-400/70 hover:border-emerald-400/50 hover:text-emerald-300',   active: 'border-emerald-400/50 bg-emerald-500/12 text-emerald-300' },
+          ].map((pill) => (
+            <button
+              key={pill.value}
+              onClick={() => setPriorityFilter(pill.value)}
+              className={`rounded-full border px-4 py-2 text-xs font-bold tracking-wide transition-all duration-200 ${
+                priorityFilter === pill.value ? pill.active : pill.classes
+              }`}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
       </div>
       {isLoading ? (
         <div className="space-y-4">

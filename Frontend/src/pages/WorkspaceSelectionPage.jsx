@@ -133,22 +133,22 @@ export default function WorkspaceSelectionPage() {
       ) : !tenants.length ? (
         <EmptyState icon={FolderOpen} title="No workspaces found" description="Create or sync a tenant first to start using the platform." />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 justify-items-center md:grid-cols-2 xl:grid-cols-3">
           {tenants.map((tenant, index) => (
-            <motion.div key={tenant.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}>
-              <Card className="h-full">
+            <motion.div key={tenant.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }} className="w-full max-w-3xl">
+              <Card className="h-full w-full">
                 <CardContent className="space-y-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-2">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-2 min-w-0">
                       <div className="inline-flex rounded-2xl border border-white/10 bg-white/5 p-3 text-cyan-300">
                         <Building2 className="h-5 w-5" />
                       </div>
                       <div>
-                        <div className="text-lg font-semibold text-white">{tenant.company_name}</div>
-                        <div className="text-sm text-slate-500">{tenant.id}</div>
+                        <div className="text-lg font-semibold text-white break-words">{tenant.company_name}</div>
+                        <div className="max-w-full truncate text-sm text-slate-500" title={tenant.id}>{tenant.id}</div>
                       </div>
                     </div>
-                    <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
+                    <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200 whitespace-nowrap">
                       Ready
                     </span>
                   </div>
@@ -159,7 +159,7 @@ export default function WorkspaceSelectionPage() {
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Integrations</div>
-                      <div className="mt-2 text-sm text-white">Power BI + Asana</div>
+                      <div className="mt-2 text-sm text-white">Asana</div>
                     </div>
                   </div>
                   <Button onClick={() => handleSelect(tenant)} className="w-full gap-2">

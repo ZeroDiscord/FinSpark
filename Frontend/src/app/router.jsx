@@ -13,8 +13,8 @@ import RecommendationsPage from '../pages/RecommendationsPage.jsx'
 import AsanaPage from '../pages/AsanaPage.jsx'
 import SettingsPage from '../pages/SettingsPage.jsx'
 import DatasetPage from '../pages/DatasetPage.jsx'
-import TrainPage from '../pages/TrainPage.jsx'
 import ExecutiveSummaryPage from '../pages/ExecutiveSummaryPage.jsx'
+import IntelligencePage from '../pages/IntelligencePage.jsx'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuthContext()
@@ -50,12 +50,12 @@ export default function AppRouter() {
         <Route path="dashboard/:tenantId" element={<DashboardPage />} />
         <Route path="dataset/:tenantId" element={<DatasetPage />} />
         <Route path="dataset" element={<Navigate to="/app/workspaces" replace />} />
-        <Route path="train/:tenantId" element={<TrainPage />} />
-        <Route path="train" element={<Navigate to="/app/workspaces" replace />} />
         <Route path="dashboard" element={<Navigate to="/app/workspaces" replace />} />
         <Route path="recommendations/:tenantId" element={<RecommendationsPage />} />
         <Route path="executive/:tenantId" element={<ExecutiveSummaryPage />} />
         <Route path="executive" element={<Navigate to="/app/workspaces" replace />} />
+        <Route path="intelligence/:tenantId" element={<IntelligencePage />} />
+        <Route path="intelligence" element={<Navigate to="/app/workspaces" replace />} />
         <Route path="recommendations" element={<Navigate to="/app/workspaces" replace />} />
         <Route path="asana" element={<AsanaPage />} />
         <Route path="settings" element={<SettingsPage />} />

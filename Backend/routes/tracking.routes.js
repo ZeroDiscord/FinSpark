@@ -37,32 +37,5 @@ router.get('/:tenantId/snippets', requireAuth, async (req, res, next) => {
   }
 });
 
-// GET /api/tracking/:tenantId/snippets/:lang/download
-router.get('/:tenantId/snippets/:lang/download', requireAuth, async (req, res, next) => {
-  try {
-    const tenant = await resolveTenant(req.params.tenantId, req.user.sub);
-    if (!tenant) return res.status(404).json({ error: 'Tenant not found.' });
-
-    const features = await getFeatureNames(tenant.id);
-    const { lang } = req.params;
-
-    const map = {
-      js: { fn: generateJS, filename: 'track.js', mime: 'application/javascript' },
-      kotlin: { fn: generateKotlin, filename: 'FeatureTracker.kt', mime: 'text/plain' },
-      dart: { fn: generateDart, filename: 'finspark_tracker.dart', mime: 'text/plain' },
-    };
-
-    if (!map[lang]) return res.status(400).json({ error: 'lang must be js, kotlin, or dart.' });
-
-    const { fn, filename, mime } = map[lang];
-    const code = fn(features, tenant.tenant_hash);
-
-    res.setHeader('Content-Type', mime);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(code);
-  } catch (err) {
-    next(err);
-  }
-});
 
 module.exports = router;

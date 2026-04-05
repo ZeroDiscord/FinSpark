@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
-import { Download, Search, RefreshCw } from 'lucide-react'
+import { Download, Search, RefreshCw, Brain } from 'lucide-react'
 import SectionHeader from '../components/ui/SectionHeader.jsx'
 import { Card, CardContent } from '../components/ui/Card.jsx'
 import Button from '../components/ui/Button.jsx'
 import LoadingSkeleton from '../components/ui/LoadingSkeleton.jsx'
 import { fetchEvents, getExportCsvUrl } from '../api/dataset.api.js'
+import { trainTenant } from '../api/tenants.api.js'
 
 const PAGE_SIZE = 50
 
@@ -60,6 +61,8 @@ export default function DatasetPage() {
   const [deployType, setDeployType] = useState('')
   const [successFilter, setSuccessFilter] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [training, setTraining]   = useState(false)
+  const [trainError, setTrainError] = useState(null)
 
   // Debounce search input
   useEffect(() => {
@@ -93,6 +96,24 @@ export default function DatasetPage() {
   // Reset to page 1 when filters change
   useEffect(() => { setPage(1) }, [debouncedSearch, deployType, successFilter])
 
+  const handleTrain = async () => {
+    if (!tenantId) return
+    setTraining(true)
+    setTrainError(null)
+    try {
+      await trainTenant(tenantId, false) // false for no augmentation
+      // After training, refresh the data to show new recommendations
+      await load()
+      // You might also want to refresh other data or navigate to recommendations
+      alert('Training completed successfully! Model has been updated with new recommendations.')
+    } catch (e) {
+      setTrainError('Training failed. Please try again.')
+      console.error('Training error:', e)
+    } finally {
+      setTraining(false)
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
@@ -102,6 +123,23 @@ export default function DatasetPage() {
         title="Event dataset"
         description={`${total.toLocaleString()} events ingested across all sessions. Filter, search, and export as CSV.`}
       />
+
+      {/* Train Button */}
+      <div className="flex justify-center">
+        <Button
+          onClick={handleTrain}
+          disabled={training || !tenantId}
+          className="gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 text-lg"
+        >
+          <Brain className="h-5 w-5" />
+          {training ? 'Training Model...' : 'Train Model & Update Recommendations'}
+        </Button>
+      </div>
+      {trainError && (
+        <div className="text-center text-sm text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-lg p-3">
+          {trainError}
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">

@@ -29,9 +29,8 @@ function generateJS(features, tenantId) {
   const norm = normalizeFeatures(features);
   const featuresStr = featureNames(norm).map(f => `"${f}"`).join(', ');
   const examples = buildJsExamples(norm);
-  return `// FinSpark Analytics SDK — Browser / Plain JS
-// CDN: <script src="https://cdn.finspark.io/sdk/v1/finspark.min.js"></script>
-// npm:  npm install @finspark/analytics-web-sdk
+  return `// FinSpark Analytics — Browser / Plain JS
+// Include this script directly in your page or bundle it with your frontend assets.
 
 const FinSparkSDK = (() => {
   const CONFIG = {
@@ -103,8 +102,7 @@ ${examples}
 function generateReact(features, tenantId) {
   const norm = normalizeFeatures(features);
   const first = norm[0] || { l1_domain: 'App', l2_module: 'General', l3_feature: 'Dashboard' };
-  return `// FinSpark Analytics — React SDK
-// npm install @finspark/analytics-react-sdk
+  return `// FinSpark Analytics — React helper
 
 import { useEffect, useRef, useCallback } from "react";
 
@@ -171,8 +169,8 @@ export const config = { matcher: ["/((?!_next|api|favicon).*)"] };
 function generateNode(features, tenantId) {
   const norm = normalizeFeatures(features);
   const first = norm[0] || { l1_domain: 'App', l2_module: 'General', l3_feature: 'upload_documents' };
-  return `// FinSpark Analytics — Node.js SDK
-// npm install @finspark/analytics-node-sdk axios
+  return `// FinSpark Analytics — Node.js tracking snippet
+// axios is required for HTTP event delivery
 
 const axios = require("axios");
 const { randomUUID } = require("crypto");
@@ -237,12 +235,11 @@ module.exports = { tracker, finsparkMiddleware };
 `;
 }
 
-// ── Python SDK ────────────────────────────────────────────────────────────────
+// ── Python tracking snippet ─────────────────────────────────────────────────────
 function generatePython(features, tenantId) {
   const norm = normalizeFeatures(features);
   const first = norm[0] || { l1_domain: 'App', l2_module: 'General', l3_feature: 'upload_documents' };
-  return `# FinSpark Analytics — Python SDK
-# pip install finspark-analytics requests
+  return `# FinSpark Analytics — Python tracking snippet
 
 import threading, time, uuid, requests
 from datetime import datetime, timezone
@@ -353,8 +350,7 @@ tracker.track(user_id="user_123", l1_domain="${first.l1_domain}", l2_module="${f
 function generateGo(features, tenantId) {
   const norm = normalizeFeatures(features);
   const first = norm[0] || { l1_domain: 'App', l2_module: 'General', l3_feature: 'upload_documents' };
-  return `// FinSpark Analytics — Go SDK
-// go get github.com/finspark/analytics-go
+  return `// FinSpark Analytics — Go tracking snippet
 
 package finspark
 

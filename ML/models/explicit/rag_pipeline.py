@@ -381,62 +381,54 @@ class FeatureRAGPipeline:
         # 2. Build prompt
         prompt = _build_rag_prompt(question, context_chunks)
 
-        # 3. Route to LLM
+        # 3. Route to LLM via OpenRouter
         answer = ""
         try:
-            # === PRIMARY: Gemini Flash Usage ===
-            import google.generativeai as genai
-            
-            gemini_api_key = os.environ.get("GEMINI_API_KEY")
-            if not gemini_api_key:
-                raise ValueError("GEMINI_API_KEY environment variable is not set.")
-                
-            genai.configure(api_key=gemini_api_key)
-            # Use the latest Flash model
-            model = genai.GenerativeModel("gemini-2.5-flash")
-            response = model.generate_content(
-                prompt,
-                generation_config=genai.GenerationConfig(
-                    temperature=0.2,
-                    max_output_tokens=512,
-                )
-            )
-            answer = response.text.strip()
-            
-            # === OPENROUTER IMPLEMENTATION (COMMENTED OUT) ===
-            # To deploy with OpenRouter, make sure the `openai` python package is installed
-            # and OPENROUTER_API_KEY is defined in your environment.
-            '''
             from openai import OpenAI
+
             openrouter_key = os.environ.get("OPENROUTER_API_KEY")
             if not openrouter_key:
-                raise ValueError("OPENROUTER_API_KEY environment variable is missing.")
-                
+                raise ValueError("OPENROUTER_API_KEY environment variable is not set.")
+
             client = OpenAI(
                 base_url="https://openrouter.ai/api/v1",
                 api_key=openrouter_key,
             )
-            
-            # Use 'openai/gpt-4o', 'anthropic/claude-3.5-sonnet', or 'ollama/llama3' via OpenRouter
-            target_model = "openai/gpt-4o" if deployment_mode == "cloud" else "meta-llama/llama-3-70b-instruct"
-            
+
+            # Use a cost-efficient model available on OpenRouter
+            target_model = (
+                "meta-llama/llama-3.1-8b-instruct:free"
+                if deployment_mode != "cloud"
+                else "openai/gpt-4o-mini"
+            )
+
             completion = client.chat.completions.create(
                 model=target_model,
                 temperature=0.2,
                 max_tokens=512,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
+                messages=[{"role": "user", "content": prompt}],
             )
             answer = completion.choices[0].message.content.strip()
-            '''
-            
+
         except Exception as exc:
             err_str = str(exc)
-            if "429" in err_str or "quota" in err_str.lower():
-                answer = "- **Gemini API Quota Exceeded**: You have exhausted your free-tier requests.\n- **Fallback Active**: System is utilizing deterministic topological insights instead."
+            if "429" in err_str or "quota" in err_str.lower() or "rate" in err_str.lower():
+                answer = (
+                    "- **API Rate Limit**: OpenRouter request limit reached. "
+                    "Retry in a moment.\n"
+                    "- **Fallback Active**: Deterministic Markov friction signals are "
+                    "shown in the insight panel instead."
+                )
+            elif "401" in err_str or "unauthorized" in err_str.lower():
+                answer = (
+                    "- **Auth Error**: OPENROUTER_API_KEY is invalid or missing.\n"
+                    "- Set OPENROUTER_API_KEY in ML/.env to enable LLM attribution."
+                )
             else:
-                answer = f"- **LLM Generation Failed**: Exception encountered during context generation.\n- **Error**: `{err_str}`"
+                answer = (
+                    f"- **LLM Generation Failed**: {err_str[:200]}\n"
+                    "- Markov-derived friction insights remain available in the panel."
+                )
 
         return {
             "answer": answer,

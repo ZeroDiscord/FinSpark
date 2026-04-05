@@ -46,33 +46,5 @@ router.get('/:tenantId/snippets', requireAuth, asyncHandler(async (req, res) => 
   return res.json(generateAll(features, tenant.tenant_hash));
 }));
 
-// GET /api/tracking/:tenantId/snippets/:lang/download
-router.get('/:tenantId/snippets/:lang/download', requireAuth, asyncHandler(async (req, res) => {
-  const tenant = await resolveTenant(req.params.tenantId, req.user.sub);
-  if (!tenant) return res.status(404).json({ error: 'Tenant not found.' });
-
-  const features = await getFeatures(tenant.id);
-  const { lang } = req.params;
-
-  const map = {
-    js:     { fn: generateJS,     filename: 'finspark.js',              mime: 'application/javascript' },
-    react:  { fn: generateReact,  filename: 'useTracker.jsx',           mime: 'application/javascript' },
-    node:   { fn: generateNode,   filename: 'finspark-node.js',         mime: 'application/javascript' },
-    python: { fn: generatePython, filename: 'finspark_tracker.py',      mime: 'text/plain' },
-    go:     { fn: generateGo,     filename: 'finspark.go',              mime: 'text/plain' },
-    java:   { fn: generateJava,   filename: 'FinSparkTracker.java',     mime: 'text/plain' },
-    kotlin: { fn: generateKotlin, filename: 'FinSparkTracker.kt',       mime: 'text/plain' },
-    dart:   { fn: generateDart,   filename: 'finspark_tracker.dart',    mime: 'text/plain' },
-  };
-
-  if (!map[lang]) return res.status(400).json({ error: 'lang must be js, kotlin, or dart.' });
-
-  const { fn, filename, mime } = map[lang];
-  const code = fn(features, tenant.tenant_hash);
-
-  res.setHeader('Content-Type', mime);
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  return res.send(code);
-}));
 
 module.exports = router;
