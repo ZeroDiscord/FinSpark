@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 import pandas as pd
 import torch
+import requests
 from sklearn.model_selection import train_test_split
 
 # Add project root to path
@@ -140,6 +141,27 @@ def train_for_all_tenants():
             json.dump(manifest, f, indent=2)
             
         print("  -> manifest.json written.\n")
+        
+        # 7. Federated Sync
+        print("  Pushing model weights to Cloud /federated/aggregate...")
+        try:
+            payload = {
+                "tenant_id": tenant,
+                "timestamp": datetime.utcnow().isoformat(),
+                "payload_type": "ml_weights",
+                "data": {
+                    "markov_weights": mc.transition_matrix.to_dict() if hasattr(mc, "transition_matrix") else {},
+                    "lstm_auc": val_auc
+                }
+            }
+            # For purely local test, assume the API is running on localhost:8000
+            res = requests.post("http://localhost:8000/federated/aggregate", json=payload, headers={"X-API-Key": "dev-secret-key"}, timeout=2)
+            if res.status_code == 200:
+                print("  -> Sync successful")
+            else:
+                print(f"  -> Sync failed with status: {res.status_code}")
+        except Exception as e:
+            print(f"  -> Sync skipped or failed: {e}")
 
     print(f"Successfully trained and persisted models for {len(tenants)} tenants.")
     print("Restart the FastAPI server so the @app.on_event('startup') hook loads them into memory!")

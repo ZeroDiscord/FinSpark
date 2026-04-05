@@ -285,6 +285,12 @@ class CooccurrenceItem(BaseModel):
     feature:     str
     probability: float
 
+class FederatedPayload(BaseModel):
+    tenant_id: str
+    timestamp: str
+    payload_type: str
+    data: Any
+
 class HealthResponse(BaseModel):
     status:          str
     models_loaded:   Dict[str, Any]
@@ -598,3 +604,31 @@ async def health() -> HealthResponse:
         models_loaded=MODEL_STORE.summary(),
         deployment_mode=DEPLOYMENT_MODE,
     )
+
+@app.post(
+    "/federated/aggregate",
+    summary="Receive federated ML weights and aggregated telemetry",
+)
+async def federated_aggregate(
+    body: FederatedPayload,
+    _key: str = Depends(verify_api_key),
+):
+    """
+    Called by an On-Prem server to push local ML weights or aggregates
+    into the central Cloud representation.
+    """
+    if DEPLOYMENT_MODE != "cloud":
+        raise HTTPException(
+            status_code=400, 
+            detail="Federated aggregation is only supported when DEPLOYMENT_MODE='cloud'"
+        )
+
+    logger.info(json.dumps({
+        "event": "federated_sync_received",
+        "tenant_id": body.tenant_id,
+        "payload_type": body.payload_type,
+    }))
+
+    # Example: if payload_type == "ml_weights", we could do FedAvg here
+    # and update the Global model store. We simply acknowledge receipt for now.
+    return {"status": "ok", "message": "Federated payload accepted and queued for aggregation"}

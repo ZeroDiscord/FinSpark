@@ -6,6 +6,7 @@ import OverviewStatsRow from '../components/dashboard/OverviewStatsRow.jsx'
 import TopDropoffTable from '../components/dashboard/TopDropoffTable.jsx'
 import TrendLineChartCard from '../components/dashboard/TrendLineChartCard.jsx'
 import UserFunnelCard from '../components/dashboard/UserFunnelCard.jsx'
+import LicenseUsageCard from '../components/dashboard/LicenseUsageCard.jsx'
 import FilterBar from '../components/ui/FilterBar.jsx'
 import SectionHeader from '../components/ui/SectionHeader.jsx'
 import { useDashboardData } from '../hooks/useDashboardData.js'
@@ -71,6 +72,7 @@ export default function DashboardPage() {
         <FeatureUsageBarChartCard data={featureUsage} loading={isLoading} error={error} />
         <ChurnHeatmapCard data={churn} loading={isLoading} error={error} />
         <UserFunnelCard data={funnel?.steps} loading={isLoading} error={error} />
+        <LicenseUsageCard data={[]} loading={isLoading} error={error} />
         <TrendLineChartCard data={trend} loading={isLoading} error={error} />
         <FeatureUsagePieChartCard data={featureUsage} loading={isLoading} error={error} />
         <TopDropoffTable rows={dropoffRows} loading={isLoading} error={error} />
