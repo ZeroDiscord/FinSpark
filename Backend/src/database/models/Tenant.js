@@ -21,6 +21,14 @@ const tenantSchema = new mongoose.Schema(
       retention_days: { type: Number, default: 180 },
       dashboard_cache_ttl_seconds: { type: Number, default: 300 },
     },
+    telemetry_consent: {
+      allow_feature_tracking:  { type: Boolean, default: true },
+      allow_session_recording: { type: Boolean, default: true },
+      allow_pii_collection:    { type: Boolean, default: false },
+      allow_external_export:   { type: Boolean, default: true },
+      updated_at:              { type: Date, default: null },
+      updated_by:              { type: String, default: null },
+    },
   },
   { collection: 'tenants', timestamps: true }
 );

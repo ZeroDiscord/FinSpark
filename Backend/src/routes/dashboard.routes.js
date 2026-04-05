@@ -84,6 +84,51 @@ router.get('/:tenantId/sessions', requireAuth, asyncHandler(async (req, res) => 
   return res.json(mlRes.data);
 }));
 
+// GET /api/dashboard/:tenantId/license-usage
+// Returns detected features vs actively used features for the tenant.
+router.get('/:tenantId/license-usage', requireAuth, asyncHandler(async (req, res) => {
+  const tenant = await resolveTenantByParam(req.params.tenantId, req.user.sub);
+  if (!tenant) return res.status(404).json({ error: 'Tenant not found.' });
+
+  const DetectedFeature = require('../database/models/DetectedFeature');
+  const UsageEvent      = require('../database/models/UsageEvent');
+
+  const [detected, usedFeatures] = await Promise.all([
+    DetectedFeature.find({ tenant_id: tenant.id }).lean(),
+    UsageEvent.distinct('l3_feature', { tenant_id: tenant.id }),
+  ]);
+
+  const usedSet = new Set(usedFeatures.filter(Boolean));
+  const rows = detected.map((f) => ({
+    l1_domain:  f.l1_domain || 'Unknown',
+    l2_module:  f.l2_module || 'Unknown',
+    l3_feature: f.l3_feature,
+    is_used:    usedSet.has(f.l3_feature),
+    confidence: f.confidence,
+  }));
+
+  const licensed = rows.length;
+  const used     = rows.filter((r) => r.is_used).length;
+  const unused   = licensed - used;
+
+  return res.json({
+    licensed,
+    used,
+    unused,
+    unused_pct: licensed ? Number(((unused / licensed) * 100).toFixed(1)) : 0,
+    by_module: Object.values(
+      rows.reduce((acc, r) => {
+        const key = r.l2_module;
+        if (!acc[key]) acc[key] = { module: key, licensed: 0, used: 0 };
+        acc[key].licensed += 1;
+        if (r.is_used) acc[key].used += 1;
+        return acc;
+      }, {})
+    ),
+    features: rows,
+  });
+}));
+
 router.get('/:tenantId/insight', requireAuth, asyncHandler(async (req, res) => {
   const tenant = await resolveTenantByParam(req.params.tenantId, req.user.sub);
   if (!tenant) return res.status(404).json({ error: 'Tenant not found.' });

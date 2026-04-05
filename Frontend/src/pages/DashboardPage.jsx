@@ -1,5 +1,6 @@
 import { useParams } from 'react-router-dom'
 import ChurnHeatmapCard from '../components/dashboard/ChurnHeatmapCard.jsx'
+import LicenseUsageCard from '../components/dashboard/LicenseUsageCard.jsx'
 import FeatureUsageBarChartCard from '../components/dashboard/FeatureUsageBarChartCard.jsx'
 import FeatureUsagePieChartCard from '../components/dashboard/FeatureUsagePieChartCard.jsx'
 import OverviewStatsRow from '../components/dashboard/OverviewStatsRow.jsx'
@@ -74,6 +75,7 @@ export default function DashboardPage() {
         <TrendLineChartCard data={trend} loading={isLoading} error={error} />
         <FeatureUsagePieChartCard data={featureUsage} loading={isLoading} error={error} />
         <TopDropoffTable rows={dropoffRows} loading={isLoading} error={error} />
+        <LicenseUsageCard tenantId={tenantId} />
       </div>
     </div>
   )

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Bot, Check, ChevronDown, ChevronUp, Copy, Download, Globe, Loader2, Plus, SearchCheck, Terminal, UploadCloud, X } from 'lucide-react'
+import { Bot, Check, ChevronDown, ChevronUp, Globe, Loader2, Plus, SearchCheck, X } from 'lucide-react'
 import Button from '../ui/Button.jsx'
-import { discoverPaths, getLoggerSnippet, uploadLogFile, generatePathLoggerSnippet } from '../../api/upload.api.js'
+import { discoverPaths } from '../../api/upload.api.js'
 
 function downloadPathsLog(paths, fileName = 'finspark-path-log.txt') {
   const rows = (paths || []).map((item) => {
@@ -44,7 +44,7 @@ function SubModeTabs({ mode, onChange }) {
 }
 
 // ─── Manual paths mode ────────────────────────────────────────────────────────
-function ManualPathsPanel({ baseUrl, onBaseUrlChange, paths, onPathsChange, onAnalyse }) {
+function ManualPathsPanel({ baseUrl, onBaseUrlChange, paths, onPathsChange, onAnalyse, loading }) {
   const [draft, setDraft] = useState('')
 
   function addPath() {
@@ -159,7 +159,6 @@ function AutoCrawlPanel({ onSubmit, loading }) {
     try {
       const result = await discoverPaths(url, { maxPages: Number(maxPages), maxDepth: Number(maxDepth) })
       setDiscovered(result)
-      // Auto-select all paths with depth ≤ 2 or link_count > 0
       const autoSelected = new Set(
         result.paths
           .filter((p) => p.depth <= 2 || p.link_count > 1)
@@ -193,7 +192,6 @@ function AutoCrawlPanel({ onSubmit, loading }) {
     if (!discovered || selected.size === 0) return
     setAnalysing(true)
     try {
-      // Build full URLs from selected paths for the AI analysis step
       const selectedPaths = discovered.paths.filter((p) => selected.has(p.path))
       await onSubmit({ url: discovered.base_url, selectedPaths, crawlDepth: Number(maxDepth) })
     } finally {
@@ -205,7 +203,6 @@ function AutoCrawlPanel({ onSubmit, loading }) {
 
   return (
     <div className="space-y-4">
-      {/* URL + options */}
       <div className="space-y-1">
         <span className="text-sm text-slate-400">Website URL to spider</span>
         <div className="flex items-center gap-3 rounded-3xl border border-white/10 bg-slate-950/70 px-4 py-3">
@@ -267,7 +264,6 @@ function AutoCrawlPanel({ onSubmit, loading }) {
         <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">{error}</div>
       )}
 
-      {/* Discovered paths table */}
       {discovered && (
         <div className="space-y-3">
           {discovered.robots_paths?.length > 0 && (
@@ -343,328 +339,9 @@ function AutoCrawlPanel({ onSubmit, loading }) {
   )
 }
 
-// ─── Logger snippet panel ─────────────────────────────────────────────────────
-function LoggerSnippetPanel() {
-  const [framework, setFramework] = useState('express')
-  const [logDir, setLogDir] = useState('./logs')
-  const [snippet, setSnippet] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [open, setOpen] = useState(false)
-
-  async function fetchSnippet() {
-    setLoading(true)
-    try {
-      const data = await getLoggerSnippet(framework, logDir)
-      setSnippet(data)
-      setOpen(true)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function copyCode() {
-    if (!snippet) return
-    navigator.clipboard.writeText(snippet.code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  function downloadCode() {
-    if (!snippet) return
-    const blob = new Blob([snippet.code], { type: 'text/plain' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = snippet.filename
-    a.click()
-  }
-
-  return (
-    <div className="rounded-2xl border border-amber-400/15 bg-amber-500/5 p-4 space-y-3">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between text-left"
-      >
-        <div className="flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-amber-400" />
-          <span className="text-sm font-medium text-amber-200">Request Logger — drop into your backend</span>
-        </div>
-        {open ? <ChevronUp className="h-4 w-4 text-amber-400" /> : <ChevronDown className="h-4 w-4 text-amber-400" />}
-      </button>
-
-      {open && (
-        <div className="space-y-3 pt-1">
-          <p className="text-xs text-amber-200/70">
-            Add this middleware to your backend to log every request path, method, status, and user ID
-            to a rotating log file. FinSpark reads these logs to show which paths your real users hit most.
-          </p>
-
-          <div className="grid grid-cols-2 gap-3">
-            <label className="space-y-1">
-              <span className="text-xs text-slate-400">Framework</span>
-              <select
-                value={framework}
-                onChange={(e) => { setFramework(e.target.value); setSnippet(null) }}
-                className="h-10 w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 text-sm text-white outline-none"
-              >
-                <option value="express">Express (Node.js)</option>
-                <option value="flask">Flask (Python)</option>
-                <option value="fastapi">FastAPI (Python)</option>
-              </select>
-            </label>
-            <label className="space-y-1">
-              <span className="text-xs text-slate-400">Log directory</span>
-              <input
-                value={logDir}
-                onChange={(e) => { setLogDir(e.target.value); setSnippet(null) }}
-                placeholder="./logs"
-                className="h-10 w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 text-sm text-white outline-none placeholder:text-slate-500"
-              />
-            </label>
-          </div>
-
-          <div className="flex gap-2">
-            <Button onClick={fetchSnippet} disabled={loading} className="gap-2 text-sm">
-              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Terminal className="h-3.5 w-3.5" />}
-              Generate snippet
-            </Button>
-          </div>
-
-          {snippet && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-slate-400">{snippet.filename}</span>
-                <div className="flex gap-2">
-                  <button onClick={copyCode} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition">
-                    {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                    {copied ? 'Copied!' : 'Copy'}
-                  </button>
-                  <button onClick={downloadCode} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition">
-                    <Download className="h-3.5 w-3.5" />
-                    Download
-                  </button>
-                </div>
-              </div>
-              <pre className="max-h-64 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-300 leading-relaxed whitespace-pre-wrap border border-white/10">
-                {snippet.code}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function LogUploadPanel() {
-  const [file, setFile] = useState(null)
-  const [result, setResult] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  async function handleUpload() {
-    if (!file) return
-    setLoading(true)
-    setError('')
-    setResult(null)
-    try {
-      const response = await uploadLogFile(file)
-      setResult(response)
-    } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Failed to extract paths from the log file.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4 space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-slate-100">
-          <UploadCloud className="h-4 w-4 text-cyan-300" />
-          <div>
-            <div className="text-sm font-medium text-white">Upload request log file</div>
-            <div className="text-xs text-slate-500">Extract URL paths ordered by request frequency.</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-        <label className="flex items-center gap-2 rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-slate-200 cursor-pointer">
-          <span>{file?.name || 'Choose .log, .jsonl, or .txt file'}</span>
-          <input
-            type="file"
-            accept=".log,.jsonl,.txt"
-            onChange={(event) => {
-              setFile(event.target.files?.[0] || null)
-              setResult(null)
-              setError('')
-            }}
-            className="hidden"
-          />
-        </label>
-
-        <Button onClick={handleUpload} disabled={!file || loading} className="gap-2 justify-center">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-          {loading ? 'Extracting…' : 'Extract paths'}
-        </Button>
-      </div>
-
-      {error ? (
-        <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">{error}</div>
-      ) : null}
-
-      {result ? (
-        <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">Log extraction</span>
-            <span className="rounded-full bg-slate-800/80 px-2 py-1 text-xs text-slate-300">
-              {result.path_stats.length} paths found
-            </span>
-          </div>
-          <div className="text-sm text-slate-300">
-            Most frequent path: <span className="font-medium text-white">{result.path_stats[0]?.path}</span> ({result.path_stats[0]?.count})
-          </div>
-          <div className="grid gap-2 text-sm text-slate-200">
-            {result.path_stats.slice(0, 12).map((row) => (
-              <div key={row.path} className="flex items-center justify-between rounded-2xl bg-slate-950/60 px-3 py-2 text-xs text-slate-300">
-                <span className="truncate">{row.path}</span>
-                <span className="ml-3 rounded-full bg-slate-800/80 px-2 py-0.5 text-xs text-slate-200">{row.count}</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={() => downloadPathsLog(result.path_stats, 'finspark-log-paths.txt')} className="gap-2 text-sm">
-              <Download className="h-3.5 w-3.5" />
-              Download frequency log
-            </Button>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-function PathFileLoggerPanel() {
-  const [file, setFile] = useState(null)
-  const [logDir, setLogDir] = useState('./logs')
-  const [result, setResult] = useState(null)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [copied, setCopied] = useState(false)
-
-  async function handleGenerate() {
-    if (!file) return
-    setLoading(true)
-    setError('')
-    setResult(null)
-    try {
-      const response = await generatePathLoggerSnippet(file, logDir)
-      setResult(response)
-    } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Failed to generate path logger code.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function copyCode() {
-    if (!result?.code) return
-    navigator.clipboard.writeText(result.code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  function downloadCode() {
-    if (!result?.code) return
-    const blob = new Blob([result.code], { type: 'text/plain' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = result.filename || 'finspark-path-logger.js'
-    a.click()
-  }
-
-  return (
-    <div className="rounded-2xl border border-violet-400/15 bg-violet-500/5 p-4 space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-slate-100">
-          <UploadCloud className="h-4 w-4 text-violet-300" />
-          <div>
-            <div className="text-sm font-medium text-white">Generate backend path logger</div>
-            <div className="text-xs text-slate-500">Upload your path file and get an Express middleware snippet that logs matching requests.</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-        <label className="flex items-center gap-2 rounded-3xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-slate-200 cursor-pointer">
-          <span>{file?.name || 'Choose .txt or .log path file'}</span>
-          <input
-            type="file"
-            accept=".txt,.log,.jsonl"
-            onChange={(event) => {
-              setFile(event.target.files?.[0] || null)
-              setResult(null)
-              setError('')
-            }}
-            className="hidden"
-          />
-        </label>
-
-        <Button onClick={handleGenerate} disabled={!file || loading} className="gap-2 justify-center">
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Terminal className="h-4 w-4" />}
-          {loading ? 'Generating…' : 'Generate logger code'}
-        </Button>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="space-y-1">
-          <span className="text-xs text-slate-400">Log directory</span>
-          <input
-            value={logDir}
-            onChange={(e) => setLogDir(e.target.value)}
-            className="h-10 w-full rounded-xl border border-white/10 bg-slate-950/70 px-3 text-sm text-white outline-none"
-            placeholder="./logs"
-          />
-        </label>
-      </div>
-
-      {error ? (
-        <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">{error}</div>
-      ) : null}
-
-      {result ? (
-        <div className="space-y-3 rounded-2xl border border-white/10 bg-slate-900/80 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Path logger snippet</div>
-              <div className="text-sm text-slate-300">{result.paths?.length ?? 0} paths logged to <code className="font-mono">{result.log_dir}</code></div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={copyCode} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition">
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
-              <button onClick={downloadCode} className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition">
-                <Download className="h-3.5 w-3.5" />
-                Download
-              </button>
-            </div>
-          </div>
-          <pre className="max-h-64 overflow-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-300 leading-relaxed whitespace-pre-wrap border border-white/10">
-            {result.code}
-          </pre>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
 // ─── Root export ──────────────────────────────────────────────
 export default function UrlInputCard({ onSubmit, loading }) {
   const [mode, setMode] = useState('crawl')
-
-  // Manual mode state
   const [baseUrl, setBaseUrl] = useState('')
   const [manualPaths, setManualPaths] = useState([])
 
@@ -693,10 +370,6 @@ export default function UrlInputCard({ onSubmit, loading }) {
       ) : (
         <AutoCrawlPanel onSubmit={handleCrawlSubmit} loading={loading} />
       )}
-
-      <LoggerSnippetPanel />
-      <LogUploadPanel />
-      <PathFileLoggerPanel />
     </div>
   )
 }

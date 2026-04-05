@@ -3,6 +3,7 @@
 const router = require('express').Router();
 const asyncHandler = require('../utils/asyncHandler');
 const { requireAuth } = require('../middleware/auth');
+const { requireRole } = require('../middleware/requireRole');
 const controller = require('../controllers/exportController');
 const { findTenantByIdForOwner, findTenantByHashForOwner } = require('../models/TenantModel');
 const { buildPowerBiPayload, buildPowerBiCsv, recordExportHistory } = require('../services/powerBiExportService');
@@ -14,8 +15,8 @@ async function resolveTenant(tenantParam, userId) {
   );
 }
 
-router.get('/powerbi', requireAuth, asyncHandler(controller.exportPowerBi));
-router.post('/powerbi/push', requireAuth, asyncHandler(controller.pushPowerBi));
+router.get('/powerbi', requireAuth, requireRole('admin', 'analyst', 'ops'), asyncHandler(controller.exportPowerBi));
+router.post('/powerbi/push', requireAuth, requireRole('admin', 'ops'), asyncHandler(controller.pushPowerBi));
 
 // GET /api/export/:tenantId/csv?type=features|recommendations|friction|events
 router.get('/:tenantId/csv', requireAuth, asyncHandler(async (req, res) => {

@@ -109,6 +109,15 @@ async function seed(skipConnect = false) {
       retention_days: 365,
       dashboard_cache_ttl_seconds: 300,
     },
+    telemetry_consent: {
+      allow_feature_tracking:  true,
+      allow_session_recording: true,
+      // onprem tenants default to PII collection off for tighter compliance posture
+      allow_pii_collection:    tenant.deployment_mode !== 'onprem',
+      allow_external_export:   tenant.deployment_mode === 'cloud',
+      updated_at: new Date(),
+      updated_by: 'seed',
+    },
   })));
 
   const passwordHash = await bcrypt.hash('Demo@1234', 10);

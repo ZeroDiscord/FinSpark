@@ -2,7 +2,6 @@ import { motion } from 'framer-motion'
 import { cn } from '../../lib/utils.js'
 
 const items = [
-  { id: 'apk', label: 'Upload APK' },
   { id: 'url', label: 'Website URL' },
   { id: 'csv', label: 'Upload CSV' },
 ]

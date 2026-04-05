@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, CheckCircle2, Sparkles } from 'lucide-react'
+import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import ApkDropzone from '../components/upload/ApkDropzone.jsx'
 import CsvDropzone from '../components/upload/CsvDropzone.jsx'
 import TrainModelPanel from '../components/upload/TrainModelPanel.jsx'
 import UploadCard from '../components/upload/UploadCard.jsx'
@@ -12,7 +11,7 @@ import Button from '../components/ui/Button.jsx'
 import SectionHeader from '../components/ui/SectionHeader.jsx'
 import { useTenantContext } from '../context/TenantContext.jsx'
 import { useUploadFlow } from '../hooks/useUploadFlow.js'
-import { parseCsvPreview, uploadApkFile, uploadCsvFile, uploadWebsiteUrl } from '../services/uploadService.js'
+import { parseCsvPreview, uploadCsvFile, uploadWebsiteUrl } from '../services/uploadService.js'
 import { REQUIRED_CSV_COLUMNS } from '../utils/csvSchema.js'
 
 function ResultCard({ result, onViewDashboard, onViewFeatures, onViewTracking }) {
@@ -83,33 +82,10 @@ export default function UploadPage() {
     setResult,
     resetUploadFlow,
   } = useUploadFlow()
-  const [apkFile, setApkFile] = useState(null)
   const [csvFile, setCsvFile] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const tenantId = activeTenant?.id
-
-  async function handleApkSelect(file) {
-    setApkFile(file)
-    setUploadProgress(25)
-    setValidationErrors([])
-  }
-
-  async function submitApk() {
-    if (!apkFile) return
-    setIsSubmitting(true)
-    setResult(null)
-    try {
-      setUploadProgress(70)
-      const response = await uploadApkFile(apkFile)
-      setUploadProgress(100)
-      setResult(response)
-    } catch (error) {
-      setValidationErrors([error.message])
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
   async function handleCsvSelect(file) {
     setCsvFile(file)
@@ -160,7 +136,6 @@ export default function UploadPage() {
 
   function resetCurrentTab() {
     resetUploadFlow()
-    setApkFile(null)
     setCsvFile(null)
     setValidationErrors([])
   }
@@ -170,7 +145,7 @@ export default function UploadPage() {
       <SectionHeader
         eyebrow="Upload pipeline"
         title="Bring in your product surface"
-        description="Upload an Android APK, crawl a web experience, or ingest usage events from CSV. Each flow validates inputs and hands off to the existing backend APIs."
+        description="Crawl a web experience or ingest usage events from CSV. Each flow validates inputs and hands off to the existing backend APIs."
       />
       {!tenantId ? (
         <div className="rounded-3xl border border-amber-400/20 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
@@ -182,7 +157,6 @@ export default function UploadPage() {
         onChange={(tab) => {
           setActiveTab(tab)
           resetCurrentTab()
-          setWebsiteUrl('')
         }}
       />
       {validationErrors.length ? (
@@ -197,26 +171,6 @@ export default function UploadPage() {
             ))}
           </ul>
         </div>
-      ) : null}
-      {activeTab === 'apk' ? (
-        <UploadCard
-          title="Android APK detection"
-          description="Drag and drop an APK to generate a feature hierarchy and bootstrapped tracking plan."
-          status={<Sparkles className="h-5 w-5 text-cyan-300" />}
-        >
-          <ApkDropzone
-            file={apkFile}
-            progress={uploadProgress}
-            onFileSelect={handleApkSelect}
-            onRemove={() => setApkFile(null)}
-            disabled={!tenantId || isSubmitting}
-          />
-          <div className="flex justify-end">
-            <Button onClick={submitApk} disabled={!apkFile || isSubmitting || !tenantId}>
-              {isSubmitting ? 'Uploading APK...' : 'Upload APK'}
-            </Button>
-          </div>
-        </UploadCard>
       ) : null}
       {activeTab === 'url' ? (
         <UploadCard

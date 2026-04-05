@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Boxes, Search } from 'lucide-react'
+import { Boxes, ChevronRight, Search, X } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/ui/Button.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
@@ -7,6 +7,7 @@ import LoadingSkeleton from '../components/ui/LoadingSkeleton.jsx'
 import SectionHeader from '../components/ui/SectionHeader.jsx'
 import { Card, CardContent } from '../components/ui/Card.jsx'
 import FeatureCard from '../components/features/FeatureCard.jsx'
+import ConfidenceBadge from '../components/features/ConfidenceBadge.jsx'
 import FeatureSummaryStats from '../components/features/FeatureSummaryStats.jsx'
 import FeatureTree from '../components/features/FeatureTree.jsx'
 import { getFeatures } from '../api/features.api.js'
@@ -49,6 +50,7 @@ export default function FeatureDetectionPage() {
   const [search, setSearch] = useState('')
   const [expandedNodes, setExpandedNodes] = useState([])
   const [selectedFeatureId, setSelectedFeatureId] = useState(null)
+  const [selectedFeature, setSelectedFeature] = useState(null)
 
   useEffect(() => {
     if (!tenantId) return
@@ -130,7 +132,10 @@ export default function FeatureDetectionPage() {
                   expandedNodes={expandedNodes}
                   onToggle={toggleNode}
                   selectedId={selectedFeatureId}
-                  onSelect={(node) => setSelectedFeatureId(node.feature?.id || node.id)}
+                  onSelect={(node) => {
+                    setSelectedFeatureId(node.feature?.id || node.id)
+                    if (node.feature) setSelectedFeature(node.feature)
+                  }}
                 />
               </CardContent>
             </Card>
@@ -139,12 +144,108 @@ export default function FeatureDetectionPage() {
                 <FeatureCard
                   key={feature.id || feature.l3_feature}
                   feature={feature}
-                  onSelect={(selected) => setSelectedFeatureId(selected.id)}
+                  onSelect={(selected) => {
+                    setSelectedFeatureId(selected.id)
+                    setSelectedFeature(selected)
+                  }}
                   onGenerateTracking={() => navigate(`/app/tracking/${tenantId}`)}
                 />
               ))}
             </div>
           </div>
+
+          {/* Feature detail panel */}
+          {selectedFeature && (
+            <Card>
+              <CardContent className="space-y-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="text-xs uppercase tracking-widest text-slate-500">Feature details</div>
+                    <div className="text-xl font-semibold text-white">
+                      {selectedFeature.name || selectedFeature.l3_feature}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ConfidenceBadge score={selectedFeature.confidence || 0.72} />
+                    <button
+                      onClick={() => setSelectedFeature(null)}
+                      className="rounded-full p-1 text-slate-500 hover:bg-white/10 hover:text-white transition"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Hierarchy breadcrumb */}
+                <div className="flex items-center gap-1.5 text-sm text-slate-400">
+                  {[selectedFeature.l1_domain, selectedFeature.l2_module, selectedFeature.l3_feature]
+                    .filter(Boolean)
+                    .map((part, i, arr) => (
+                      <span key={i} className="flex items-center gap-1.5">
+                        <span className={i === arr.length - 1 ? 'text-cyan-300 font-medium' : ''}>{part}</span>
+                        {i < arr.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-slate-600" />}
+                      </span>
+                    ))}
+                </div>
+
+                {/* Metadata grid */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {[
+                    { label: 'Source', value: selectedFeature.source_type },
+                    { label: 'Action', value: selectedFeature.l4_action },
+                    { label: 'Node', value: selectedFeature.l5_deployment_node },
+                    { label: 'Upload ID', value: selectedFeature.upload_id },
+                    { label: 'Raw name', value: selectedFeature.raw_name },
+                  ]
+                    .filter((row) => row.value)
+                    .map((row) => (
+                      <div key={row.label} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                        <div className="text-xs text-slate-500 uppercase tracking-widest mb-1">{row.label}</div>
+                        <div className="text-sm text-white truncate">{row.value}</div>
+                      </div>
+                    ))}
+                </div>
+
+                {/* Evidence list */}
+                {Array.isArray(selectedFeature.evidence) && selectedFeature.evidence.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-xs uppercase tracking-widest text-slate-500">Evidence</div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedFeature.evidence.map((ev, i) => (
+                        <span
+                          key={i}
+                          className="rounded-full border border-indigo-400/20 bg-indigo-500/10 px-3 py-1 text-xs text-indigo-200"
+                        >
+                          {ev.type}{ev.value ? ` — ${ev.value}` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Raw names */}
+                {Array.isArray(selectedFeature.raw_names) && selectedFeature.raw_names.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-xs uppercase tracking-widest text-slate-500">Raw names detected</div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedFeature.raw_names.map((name, i) => (
+                        <span key={i} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 font-mono">
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-1">
+                  <Button onClick={() => navigate(`/app/tracking/${tenantId}`)} className="gap-2">
+                    Generate tracking
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

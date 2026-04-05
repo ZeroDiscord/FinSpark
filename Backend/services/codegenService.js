@@ -5,9 +5,30 @@
  * All templates are pure string interpolation — no subprocess needed.
  */
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function normalizeFeatures(features) {
+  return features.map(f =>
+    typeof f === 'string'
+      ? { l1_domain: 'App', l2_module: 'General', l3_feature: f }
+      : f
+  );
+}
+
+function featureNames(features) {
+  return features.map(f => (typeof f === 'string' ? f : f.l3_feature));
+}
+
+function buildJsExamples(features) {
+  return features.slice(0, 3).map(f =>
+    `FinSparkSDK.track({ l1_domain: "${f.l1_domain}", l2_module: "${f.l2_module}", l3_feature: "${f.l3_feature}", l4_action: "click" });`
+  ).join('\n');
+}
+
 // ── Web (Browser) SDK ─────────────────────────────────────────────────────────
 function generateJS(features, tenantId) {
-  const featuresStr = features.map(f => `"${f}"`).join(', ');
+  const norm = normalizeFeatures(features);
+  const featuresStr = featureNames(norm).map(f => `"${f}"`).join(', ');
+  const examples = buildJsExamples(norm);
   return `// FinSpark Analytics SDK — Browser / Plain JS
 // CDN: <script src="https://cdn.finspark.io/sdk/v1/finspark.min.js"></script>
 // npm:  npm install @finspark/analytics-web-sdk
@@ -74,20 +95,14 @@ const FinSparkSDK = (() => {
 })();
 
 // ── Usage examples ────────────────────────────────────────────────────────────
-// Finance → Portfolio → Buy Stock
-FinSparkSDK.track({ l1_domain: "Finance", l2_module: "Portfolio", l3_feature: "BuyStock", l4_action: "Submit", duration_ms: 1450, success: true, metadata: { stock: "AAPL", amount: 5000 } });
-
-// Finance → Watchlist → Add Symbol
-FinSparkSDK.track({ l1_domain: "Finance", l2_module: "Watchlist", l3_feature: "AddSymbol", l4_action: "Click" });
-
-// Banking → Transfers → UPI
-FinSparkSDK.track({ l1_domain: "Banking", l2_module: "Transfers", l3_feature: "UPI", l4_action: "Success" });
+${examples}
 `;
 }
 
 // ── React SDK / Hook ──────────────────────────────────────────────────────────
 function generateReact(features, tenantId) {
-  const first = features[0] || 'Dashboard';
+  const norm = normalizeFeatures(features);
+  const first = norm[0] || { l1_domain: 'App', l2_module: 'General', l3_feature: 'Dashboard' };
   return `// FinSpark Analytics — React SDK
 // npm install @finspark/analytics-react-sdk
 
@@ -127,16 +142,16 @@ export function useTracker({ deploymentType = "cloud" } = {}) {
 }
 
 // ── Usage in a component ──────────────────────────────────────────────────────
-export default function BuyStockButton() {
+export default function ${first.l3_feature.replace(/\s+/g, '')}Button() {
   const { track } = useTracker();
 
   function handleClick() {
     const t0 = Date.now();
     // ... do purchase logic ...
-    track({ l1_domain: "Finance", l2_module: "Portfolio", l3_feature: "${first}", l4_action: "Submit", duration_ms: Date.now() - t0, success: true, metadata: { stock: "AAPL" } });
+    track({ l1_domain: "${first.l1_domain}", l2_module: "${first.l2_module}", l3_feature: "${first.l3_feature}", l4_action: "Submit", duration_ms: Date.now() - t0, success: true });
   }
 
-  return <button onClick={handleClick}>Buy Stock</button>;
+  return <button onClick={handleClick}>${first.l3_feature}</button>;
 }
 
 // ── Next.js middleware ─────────────────────────────────────────────────────────
@@ -154,7 +169,8 @@ export const config = { matcher: ["/((?!_next|api|favicon).*)"] };
 
 // ── Node.js SDK ───────────────────────────────────────────────────────────────
 function generateNode(features, tenantId) {
-  const first = features[0] || 'upload_documents';
+  const norm = normalizeFeatures(features);
+  const first = norm[0] || { l1_domain: 'App', l2_module: 'General', l3_feature: 'upload_documents' };
   return `// FinSpark Analytics — Node.js SDK
 // npm install @finspark/analytics-node-sdk axios
 
@@ -214,7 +230,7 @@ function finsparkMiddleware(req, res, next) {
 // ── Usage ──────────────────────────────────────────────────────────────────────
 // app.use(finsparkMiddleware);
 
-tracker.track({ userId: "user_123", l1_domain: "Loan Management", l2_module: "Loan Application", l3_feature: "${first}", l4_action: "open", metadata: { page: "/dashboard" } });
+tracker.track({ userId: "user_123", l1_domain: "${first.l1_domain}", l2_module: "${first.l2_module}", l3_feature: "${first.l3_feature}", l4_action: "open", metadata: { page: "/dashboard" } });
 
 process.on("SIGTERM", () => tracker.shutdown());
 module.exports = { tracker, finsparkMiddleware };
@@ -223,7 +239,8 @@ module.exports = { tracker, finsparkMiddleware };
 
 // ── Python SDK ────────────────────────────────────────────────────────────────
 function generatePython(features, tenantId) {
-  const first = features[0] || 'upload_documents';
+  const norm = normalizeFeatures(features);
+  const first = norm[0] || { l1_domain: 'App', l2_module: 'General', l3_feature: 'upload_documents' };
   return `# FinSpark Analytics — Python SDK
 # pip install finspark-analytics requests
 
@@ -326,15 +343,16 @@ def track_feature(l1_domain, l2_module, l3_feature, user_id="system"):
     return decorator
 
 # Usage:
-# @track_feature("Finance", "Portfolio", "${first}")
-# def buy_stock(symbol, amount): ...
-tracker.track(user_id="user_123", l1_domain="Finance", l2_module="Portfolio", l3_feature="${first}", l4_action="view")
+# @track_feature("${first.l1_domain}", "${first.l2_module}", "${first.l3_feature}")
+# def handle_feature(*args, **kwargs): ...
+tracker.track(user_id="user_123", l1_domain="${first.l1_domain}", l2_module="${first.l2_module}", l3_feature="${first.l3_feature}", l4_action="view")
 `;
 }
 
 // ── Go SDK ────────────────────────────────────────────────────────────────────
 function generateGo(features, tenantId) {
-  const first = features[0] || 'upload_documents';
+  const norm = normalizeFeatures(features);
+  const first = norm[0] || { l1_domain: 'App', l2_module: 'General', l3_feature: 'upload_documents' };
   return `// FinSpark Analytics — Go SDK
 // go get github.com/finspark/analytics-go
 
@@ -442,13 +460,14 @@ func (t *Tracker) Shutdown() { t.ticker.Stop(); close(t.done); t.Flush() }
 // ── Example usage ─────────────────────────────────────────────────────────────
 // tracker := finspark.NewTracker("http://localhost:3001/api/events")
 // defer tracker.Shutdown()
-// tracker.Track("user_123", "Finance", "Portfolio", "${first}", "open", 0, true, nil)
+// tracker.Track("user_123", "${first.l1_domain}", "${first.l2_module}", "${first.l3_feature}", "open", 0, true, nil)
 `;
 }
 
 // ── Java SDK ──────────────────────────────────────────────────────────────────
 function generateJava(features, tenantId) {
-  const first = features[0] || 'UploadDocuments';
+  const norm = normalizeFeatures(features);
+  const first = norm[0] || { l1_domain: 'App', l2_module: 'General', l3_feature: 'UploadDocuments' };
   return `// FinSpark Analytics — Java SDK
 // Maven: <dependency>io.finspark / analytics-java / 1.0.0</dependency>
 
@@ -536,14 +555,16 @@ public class FinSparkTracker {
 
 // ── Usage ─────────────────────────────────────────────────────────────────────
 // FinSparkTracker tracker = new FinSparkTracker("http://localhost:3001/api/events");
-// tracker.track("user_123", "Finance", "Portfolio", "${first}", "open", 0, true, null);
+// tracker.track("user_123", "${first.l1_domain}", "${first.l2_module}", "${first.l3_feature}", "open", 0, true, null);
 // Runtime.getRuntime().addShutdownHook(new Thread(tracker::shutdown));
 `;
 }
 
 // ── Kotlin / Android SDK (existing, extended) ─────────────────────────────────
 function generateKotlin(features, tenantId) {
-  const featuresStr = features.map(f => `"${f}"`).join(', ');
+  const norm = normalizeFeatures(features);
+  const first = norm[0] || { l1_domain: 'App', l2_module: 'General', l3_feature: 'Dashboard' };
+  const featuresStr = featureNames(norm).map(f => `"${f}"`).join(', ');
   return `// FinSpark Analytics — Android / Kotlin SDK
 // gradle: implementation("io.finspark:analytics-android:1.0.0")
 // Supported Features: [${featuresStr}]
@@ -603,13 +624,15 @@ object FinSparkTracker {
 
 // Usage:
 // FinSparkTracker.init(applicationContext, userId = "user_123")
-// FinSparkTracker.trackFeature("Finance", "Portfolio", "BuyStock", "Submit", durationMs = 1450, metadata = mapOf("stock" to "AAPL"))
+// FinSparkTracker.trackFeature("${first.l1_domain}", "${first.l2_module}", "${first.l3_feature}", "Submit", durationMs = 1450)
 `;
 }
 
 // ── Dart / Flutter SDK (existing, kept) ──────────────────────────────────────
 function generateDart(features, tenantId) {
-  const featuresStr = features.map(f => `'${f}'`).join(', ');
+  const norm = normalizeFeatures(features);
+  const first = norm[0] || { l1_domain: 'App', l2_module: 'General', l3_feature: 'Dashboard' };
+  const featuresStr = featureNames(norm).map(f => `'${f}'`).join(', ');
   return `// FinSpark Analytics — Dart / Flutter SDK
 // Supported Features: [${featuresStr}]
 
@@ -665,7 +688,7 @@ class FinSparkTracker {
 
 // Usage:
 // await FinSparkTracker.init();
-// FinSparkTracker.track('BuyStock', 'Submit', l1Domain: 'Finance', l2Module: 'Portfolio', durationMs: 1200);
+// FinSparkTracker.track('${first.l3_feature}', 'Submit', l1Domain: '${first.l1_domain}', l2Module: '${first.l2_module}', durationMs: 1200);
 `;
 }
 

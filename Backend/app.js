@@ -24,6 +24,8 @@ const predictRoutes = require('./routes/predict.routes');
 const recommendRoutes = require('./src/routes/recommendation.routes');
 const asanaRoutes = require('./src/routes/asana.routes');
 const exportRoutes = require('./src/routes/export.routes');
+const federatedRoutes = require('./src/routes/federated.routes');
+const auditRoutes = require('./src/routes/audit.routes');
 
 const app = express();
 
@@ -68,6 +70,8 @@ app.use('/api/predict', predictRoutes);
 app.use('/api/recommendations', recommendRoutes);
 app.use('/api/asana', asanaRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/federated', federatedRoutes);
+app.use('/api/audit', auditRoutes);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'finspark-backend' }));

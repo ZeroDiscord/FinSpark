@@ -56,6 +56,15 @@ async function retrain(req, res) {
     reason: req.body.reason || 'manual',
   });
 
+  const AuditLog = require('../database/models/AuditLog');
+  AuditLog.create({
+    tenant_id: req.body.tenant_id || req.user?.tenant_db_id || 'unknown',
+    actor_id:  req.user?.sub || 'system',
+    action:    'model_retrained',
+    resource:  'ml_model',
+    after:     { reason: req.body.reason || 'manual' },
+  }).catch(() => null);
+
   return res.status(202).json({
     success: true,
     data: result,

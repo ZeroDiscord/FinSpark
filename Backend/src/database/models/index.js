@@ -2,6 +2,7 @@
 
 module.exports = {
   Tenant: require('./Tenant'),
+  AuditLog: require('./AuditLog'),
   User: require('./User'),
   UploadedFile: require('./UploadedFile'),
   DetectedFeature: require('./DetectedFeature'),

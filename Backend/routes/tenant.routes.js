@@ -38,6 +38,46 @@ router.get('/:tenantId', requireAuth, async (req, res, next) => {
   }
 });
 
+// PATCH /api/tenants/:tenantId/consent
+// Updates telemetry consent settings for the tenant (admin only).
+router.patch('/:tenantId/consent', requireAuth, async (req, res, next) => {
+  try {
+    const tenant = await findTenantByIdForOwner(req.params.tenantId, req.user.sub);
+    if (!tenant) return res.status(404).json({ error: 'Tenant not found.' });
+    if (req.user.role && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can update consent settings.' });
+    }
+
+    const allowed = ['allow_feature_tracking', 'allow_session_recording', 'allow_pii_collection', 'allow_external_export'];
+    const updates = {};
+    for (const key of allowed) {
+      if (typeof req.body[key] === 'boolean') {
+        updates[`telemetry_consent.${key}`] = req.body[key];
+      }
+    }
+    updates['telemetry_consent.updated_at'] = new Date();
+    updates['telemetry_consent.updated_by'] = req.user.sub;
+
+    await Tenant.updateOne({ tenant_key: tenant.id }, { $set: updates });
+
+    // Audit log
+    const { AuditLog } = require('../src/database/models');
+    await AuditLog.create({
+      tenant_id:  tenant.id,
+      actor_id:   req.user.sub,
+      action:     'consent_updated',
+      resource:   'tenant_consent',
+      before:     null,
+      after:      updates,
+    }).catch(() => null);
+
+    await cacheInvalidateTenant(tenant.id);
+    return res.json({ updated: true, changes: updates });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/tenants/:tenantId/train
 router.post('/:tenantId/train', requireAuth, async (req, res, next) => {
   try {

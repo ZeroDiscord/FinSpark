@@ -7,6 +7,7 @@ import {
   Sparkles,
   Upload,
   Workflow,
+  BrainCircuit,
 } from 'lucide-react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useTenantContext } from '../../context/TenantContext.jsx'
@@ -25,6 +26,7 @@ const items = [
   { label: 'Upload', to: '/app/upload', icon: Upload },
   { label: 'Features', to: '/app/features', icon: Boxes },
   { label: 'Tracking', to: '/app/tracking', icon: Workflow },
+  { label: 'Executive Summary', to: '/app/executive', icon: BrainCircuit },
   { label: 'Recommendations', to: '/app/recommendations', icon: Sparkles },
   { label: 'Asana', to: '/app/asana', icon: GitBranchPlus },
   { label: 'Settings', to: '/app/settings', icon: Cog },
@@ -34,6 +36,7 @@ function getTitle(pathname) {
   if (pathname.includes('/app/dashboard/')) return 'Enterprise Analytics Dashboard'
   if (pathname.includes('/app/features/')) return 'Detected Feature Map'
   if (pathname.includes('/app/tracking/')) return 'Tracking Code Generator'
+  if (pathname.includes('/app/executive/')) return 'Executive Summary'
   if (pathname.includes('/app/recommendations/')) return 'Recommendation Center'
   return pageMeta[pathname] || 'Enterprise Feature Intelligence'
 }
