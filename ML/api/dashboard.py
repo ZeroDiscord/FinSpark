@@ -22,7 +22,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, PROJECT_ROOT)
+REPO_ROOT = os.path.dirname(PROJECT_ROOT)
+for path in (PROJECT_ROOT, REPO_ROOT):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -88,7 +91,7 @@ class FeatureUsageItem(BaseModel):
 
 def _get_model_store():
     """Import model store from main app."""
-    from ML.api.main import MODEL_STORE
+    from api.main import MODEL_STORE
     return MODEL_STORE
 
 

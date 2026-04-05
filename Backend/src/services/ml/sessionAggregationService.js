@@ -88,9 +88,9 @@ function buildSessionSummary(events) {
 
 function buildMlPayloadFromSession(session) {
   return {
-    feature_sequence: session.feature_sequence || [],
-    duration_ms: session.duration_sequence_ms || [],
-    success: session.success_sequence || [],
+    tenant_id: session.tenant_id,
+    session_sequence: session.feature_sequence || [],
+    deployment_mode: session.deployment_type || 'cloud',
   };
 }
 

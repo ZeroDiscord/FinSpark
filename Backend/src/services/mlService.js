@@ -25,7 +25,7 @@ async function postWithRetry(path, payload, options = {}) {
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
       const response = await mlApi.post(path, payload, {
-        timeout: options.timeout ?? 30000,
+        timeout: options.timeout ?? 120000,
       });
       return response.data;
     } catch (error) {
@@ -42,16 +42,16 @@ async function postWithRetry(path, payload, options = {}) {
 function buildFeatureSequencePayload(events) {
   const ordered = [...events].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   return {
-    feature_sequence: ordered.map((event) => event.l3_feature),
-    duration_ms: ordered.map((event) => Number(event.duration_ms || 0)),
-    success: ordered.map((event) => Boolean(event.success)),
+    tenant_id: ordered[0]?.tenant_id || '',
+    session_sequence: ordered.map((event) => event.l3_feature).filter(Boolean),
+    deployment_mode: ordered[0]?.deployment_type || 'cloud',
   };
 }
 
 async function predictChurnFromEvents(events) {
   try {
     const payload = buildFeatureSequencePayload(events);
-    return await postWithRetry('/predict', payload, { timeout: 15000, retries: 1 });
+    return await postWithRetry('/predict', payload, { timeout: 60000, retries: 1 });
   } catch (error) {
     throw new MlServiceUnavailableError(error.response?.data || error.message);
   }
@@ -59,7 +59,7 @@ async function predictChurnFromEvents(events) {
 
 async function predictChurnFromSession(sessionPayload) {
   try {
-    return await postWithRetry('/predict', sessionPayload, { timeout: 15000, retries: 1 });
+    return await postWithRetry('/predict', sessionPayload, { timeout: 60000, retries: 1 });
   } catch (error) {
     throw new MlServiceUnavailableError(error.response?.data || error.message);
   }

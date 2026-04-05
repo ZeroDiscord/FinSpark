@@ -38,7 +38,19 @@ const csvUpload = multer({
   },
 });
 
+const logUpload = multer({
+  storage: buildStorage(config.uploads.logDir),
+  limits: { fileSize: config.uploads.maxLogSizeMb * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowedExtensions = ['.log', '.jsonl', '.txt'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedExtensions.includes(ext)) return cb(null, true);
+    return cb(new InvalidFileError('Only .log, .jsonl, or .txt files are allowed.'));
+  },
+});
+
 module.exports = {
   uploadApkSingle: apkUpload.single('file'),
   uploadCsvSingle: csvUpload.single('file'),
+  uploadLogSingle: logUpload.single('file'),
 };

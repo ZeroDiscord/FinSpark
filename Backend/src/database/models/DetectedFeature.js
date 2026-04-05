@@ -11,7 +11,7 @@ const detectedFeatureSchema = new mongoose.Schema(
     l1_domain: { type: String, index: true },
     l2_module: { type: String, index: true },
     l3_feature: { type: String, required: true, index: true },
-    source_type: { type: String, enum: ['apk', 'url', 'csv'], required: true },
+    source_type: { type: String, enum: ['apk', 'url', 'csv', 'demo_seed'], required: true },
     confidence: { type: Number, default: 0.5 },
     raw_identifier: String,
     first_seen_at: { type: Date, default: Date.now },

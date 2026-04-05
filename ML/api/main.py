@@ -18,18 +18,19 @@ Docs:           /docs (Swagger UI), /redoc.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 import sys
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 import yaml
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query, Security, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 
@@ -39,9 +40,13 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-# Add project root to path so relative imports resolve
+# Add both the ML package root and repo root so imports work whether the app is
+# launched from FinSpark/ or FinSpark/ML/.
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, PROJECT_ROOT)
+REPO_ROOT = os.path.dirname(PROJECT_ROOT)
+for path in (PROJECT_ROOT, REPO_ROOT):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 # ---------------------------------------------------------------------------
 # Structured JSON logging
@@ -320,8 +325,8 @@ async def ingest(
     """
     Pipeline: file format detection → field mapping / LLM conversion → PII masking.
     """
-    from ML.ingestion.detector import detect_format
-    from ML.ingestion.converter import convert_to_schema
+    from ingestion.detector import detect_format
+    from ingestion.converter import convert_to_schema
 
     t0 = time.perf_counter()
     warnings: List[str] = []
@@ -425,7 +430,7 @@ async def train(
     tenant_dir = os.path.join(PROJECT_ROOT, "data", "models", body.tenant_id)
     os.makedirs(tenant_dir, exist_ok=True)
     ckpt = os.path.join(tenant_dir, "best_lstm.pt")
-    history = trainer.train(ds, epochs=15, batch_size=16, patience=5, checkpoint_path=ckpt)
+    history = trainer.train(ds, epochs=30, batch_size=16, patience=10, checkpoint_path=ckpt)
     val_auc = history["val_auc"][-1] if history["val_auc"] else 0.0
 
     # RAG
@@ -469,6 +474,198 @@ async def train(
 
 
 @app.post(
+    "/train/stream",
+    summary="Train models with SSE epoch-by-epoch progress stream",
+)
+async def train_stream(
+    body: TrainRequest,
+    _key: str = Depends(verify_api_key),
+) -> StreamingResponse:
+    """
+    Identical to POST /train but streams Server-Sent Events with per-epoch
+    metrics so the frontend can render a live progress bar.
+
+    SSE event types:
+      - phase   : { phase: "markov"|"lstm"|"rag"|"ensemble"|"done"|"error", message: str }
+      - epoch   : { epoch: int, total: int, train_loss: float, val_loss: float, val_auc: float }
+      - result  : { markov_states: int, lstm_val_auc: float, rag_documents: int, tenant_id: str }
+      - error   : { detail: str }
+    """
+    from models.implicit.markov import MarkovChain
+    from models.implicit.ngram import NgramModel
+    from models.implicit.lstm_encoder import (
+        LSTMChurnEncoder, LSTMTrainer, SessionDataset, augment_sequences
+    )
+    from models.explicit.rag_pipeline import FeatureRAGPipeline
+    from models.ensemble import PredictionEnsemble
+
+    def _sse(event: str, data: Dict[str, Any]) -> str:
+        return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+    def _generate() -> Generator[str, None, None]:
+        try:
+            # --- Data setup ---
+            cached = MODEL_STORE.get(body.tenant_id) if MODEL_STORE.has(body.tenant_id) else {}
+            sequences: List[List[str]] = cached.get("sequences") or [
+                ["kyc_check", "doc_upload", "bureau_pull", "disbursement"],
+                ["kyc_check", "doc_upload", "kyc_check", "drop_off"],
+                ["bureau_pull", "manual_review", "disbursement"],
+                ["kyc_check", "drop_off"],
+                ["bureau_pull", "disbursement"],
+            ]
+            labels: List[int] = cached.get("labels") or [0, 1, 0, 1, 0]
+
+            if body.augment:
+                sequences, labels = augment_sequences(sequences, labels, target_size=200)
+
+            absorption_states = ["disbursement", "drop_off"]
+
+            # --- Phase: Markov ---
+            yield _sse("phase", {"phase": "markov", "message": "Fitting Markov chain..."})
+            mc = MarkovChain()
+            mc.fit(sequences, absorption_states=absorption_states)
+            ngm = NgramModel(n=3)
+            ngm.fit(sequences)
+
+            # --- Phase: LSTM with per-epoch streaming ---
+            yield _sse("phase", {"phase": "lstm", "message": "Training LSTM encoder..."})
+
+            EPOCHS = 30
+            PATIENCE = 10
+            ds = SessionDataset(sequences, labels)
+            lstm_model = LSTMChurnEncoder(vocab_size=len(ds.vocab))
+            trainer = LSTMTrainer(lstm_model, device="cpu")
+
+            tenant_dir = os.path.join(PROJECT_ROOT, "data", "models", body.tenant_id)
+            os.makedirs(tenant_dir, exist_ok=True)
+            ckpt = os.path.join(tenant_dir, "best_lstm.pt")
+
+            # Inline training loop that yields SSE per epoch
+            import torch
+            import torch.nn as nn
+            from torch.utils.data import DataLoader, random_split
+
+            trainer._vocab = ds.vocab
+            n_val = max(1, int(len(ds) * 0.2))
+            n_train = len(ds) - n_val
+            train_ds, val_ds = random_split(ds, [n_train, n_val])
+
+            train_loader = DataLoader(
+                train_ds, batch_size=16, shuffle=True,
+                collate_fn=SessionDataset.collate_fn,
+            )
+            val_loader = DataLoader(
+                val_ds, batch_size=16, shuffle=False,
+                collate_fn=SessionDataset.collate_fn,
+            )
+
+            history: Dict[str, List[float]] = {"train_loss": [], "val_loss": [], "val_auc": []}
+            best_val_loss = float("inf")
+            epochs_without_improvement = 0
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                trainer.optimizer, mode="min", factor=0.5, patience=2
+            )
+
+            for epoch in range(1, EPOCHS + 1):
+                trainer.model.train()
+                train_loss = 0.0
+                for padded, lengths, labels_t in train_loader:
+                    padded = padded.to(trainer.device)
+                    lengths = lengths.to(trainer.device)
+                    labels_t = labels_t.to(trainer.device)
+                    if trainer.label_smoothing > 0:
+                        labels_t = labels_t * (1.0 - trainer.label_smoothing) + 0.5 * trainer.label_smoothing
+                    trainer.optimizer.zero_grad()
+                    churn_prob, _ = trainer.model(padded, lengths)
+                    loss = trainer.criterion(churn_prob.squeeze(1), labels_t)
+                    loss.backward()
+                    nn.utils.clip_grad_norm_(trainer.model.parameters(), max_norm=1.0)
+                    trainer.optimizer.step()
+                    train_loss += loss.item()
+                train_loss /= max(len(train_loader), 1)
+
+                val_loss, val_auc = trainer._evaluate(val_loader)
+                scheduler.step(val_loss)
+
+                history["train_loss"].append(round(train_loss, 6))
+                history["val_loss"].append(round(val_loss, 6))
+                history["val_auc"].append(round(val_auc, 6))
+
+                yield _sse("epoch", {
+                    "epoch": epoch,
+                    "total": EPOCHS,
+                    "train_loss": round(train_loss, 4),
+                    "val_loss": round(val_loss, 4),
+                    "val_auc": round(val_auc, 4),
+                })
+
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    epochs_without_improvement = 0
+                    torch.save(trainer.model.state_dict(), ckpt)
+                else:
+                    epochs_without_improvement += 1
+                    if epochs_without_improvement >= PATIENCE:
+                        yield _sse("phase", {"phase": "lstm", "message": f"Early stop at epoch {epoch}"})
+                        break
+
+            if os.path.exists(ckpt):
+                trainer.model.load_state_dict(torch.load(ckpt, map_location=trainer.device, weights_only=True))
+
+            val_auc = history["val_auc"][-1] if history["val_auc"] else 0.0
+
+            # --- Phase: RAG ---
+            yield _sse("phase", {"phase": "rag", "message": "Indexing RAG documents..."})
+            rag = FeatureRAGPipeline(collection_name=f"tenant_{body.tenant_id}")
+            feature_docs = [
+                {"id": feat, "description": f"Feature {feat}", "churn_rate": 0.1}
+                for feat in ngm.vocab if not feat.startswith("<")
+            ]
+            rag.index_features(feature_docs)
+
+            # --- Phase: Ensemble ---
+            yield _sse("phase", {"phase": "ensemble", "message": "Assembling ensemble..."})
+            ensemble = PredictionEnsemble(
+                markov_model=mc,
+                ngram_model=ngm,
+                lstm_trainer=trainer,
+                confidence_threshold=CONFIDENCE_THRESHOLD,
+            )
+
+            MODEL_STORE.set(body.tenant_id, {
+                "markov": mc, "ngram": ngm, "lstm_trainer": trainer,
+                "rag": rag, "ensemble": ensemble,
+                "sequences": sequences, "labels": labels,
+            })
+
+            # Persist
+            mc.save(os.path.join(tenant_dir, "markov.pkl"))
+            ngm.save(os.path.join(tenant_dir, "ngram.pkl"))
+            trainer.save(os.path.join(tenant_dir, "lstm"))
+
+            yield _sse("result", {
+                "markov_states": len(mc.states),
+                "lstm_val_auc": round(val_auc, 4),
+                "rag_documents": rag.count(),
+                "tenant_id": body.tenant_id,
+            })
+            yield _sse("phase", {"phase": "done", "message": "Training complete."})
+
+        except Exception as exc:
+            logger.error(f"train_stream error: {exc}")
+            yield _sse("error", {"detail": str(exc)})
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.post(
     "/predict",
     response_model=PredictResponse,
     summary="Full ensemble churn prediction for a session",
@@ -502,7 +699,7 @@ async def predict(
     llm_fallback_result: Optional[Dict[str, Any]] = None
 
     if result.get("requires_llm_fallback"):
-        from ML.llm_fallback.router import LLMRouter
+        from llm_fallback.router import LLMRouter
         router = LLMRouter(
             deployment_mode=body.deployment_mode,
             config=CFG,

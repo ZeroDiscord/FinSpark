@@ -37,10 +37,16 @@ async function register(req, res) {
   const existing = await findUserByEmail(email);
   if (existing) throw new ValidationError('Email already registered.');
 
-  const tenant = await createTenant({
-    companyName: company_name,
-    tenantHash: hashTenantId(company_name),
-  });
+  let tenant;
+  try {
+    tenant = await createTenant({
+      companyName: company_name,
+      tenantHash: hashTenantId(company_name),
+    });
+  } catch (err) {
+    if (err.code === 11000) throw new ValidationError('A workspace with this company name already exists.');
+    throw err;
+  }
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await createUser({
     email,

@@ -28,8 +28,10 @@ const config = {
   uploads: {
     apkDir: process.env.APK_UPLOAD_DIR || './uploads/apk',
     csvDir: process.env.CSV_UPLOAD_DIR || './uploads/csv',
+    logDir: process.env.LOG_UPLOAD_DIR || './uploads/logs',
     maxApkSizeMb: 150,
     maxCsvSizeMb: 50,
+    maxLogSizeMb: 20,
   },
 
   apktool: {
@@ -50,6 +52,10 @@ const config = {
     workspaceId: process.env.POWERBI_WORKSPACE_ID || '',
     datasetId: process.env.POWERBI_DATASET_ID || '',
     tableName: process.env.POWERBI_TABLE_NAME || 'FeatureIntelligence',
+  },
+
+  openrouter: {
+    apiKey: process.env.OPENROUTER_API_KEY || '',
   },
 
   piiSalt: process.env.PII_SALT || 'CHANGE_ME',

@@ -84,8 +84,8 @@ function featureMetaMap() {
   return map;
 }
 
-async function seed() {
-  await connectDatabase();
+async function seed(skipConnect = false) {
+  if (!skipConnect) await connectDatabase();
 
   await Promise.all([
     Tenant.deleteMany({}),
@@ -333,10 +333,13 @@ async function seed() {
   console.log('Hackathon demo seed complete');
   console.log('Demo users: ops@banka.com, ops@bankb.com, ops@bankc.com');
   console.log('Password: Demo@1234');
-  process.exit(0);
 }
 
-seed().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+module.exports = { seed };
+
+if (require.main === module) {
+  seed().then(() => process.exit(0)).catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

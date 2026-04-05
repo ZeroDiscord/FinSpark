@@ -13,9 +13,9 @@ export async function uploadApkFile(file) {
   }
 }
 
-export async function uploadWebsiteUrl({ url, crawlDepth = 0 }) {
+export async function uploadWebsiteUrl({ url, crawlDepth = 0, manualPaths, selectedPaths }) {
   try {
-    return await uploadUrl(url, crawlDepth)
+    return await uploadUrl(url, crawlDepth, { manualPaths, selectedPaths })
   } catch (error) {
     throw new Error(normalizeError(error, 'Website analysis failed.'))
   }

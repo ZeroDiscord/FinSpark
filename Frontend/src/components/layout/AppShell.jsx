@@ -25,7 +25,6 @@ const items = [
   { label: 'Upload', to: '/app/upload', icon: Upload },
   { label: 'Features', to: '/app/features', icon: Boxes },
   { label: 'Tracking', to: '/app/tracking', icon: Workflow },
-  { label: 'Dashboard', to: '/app/dashboard', icon: BarChart3 },
   { label: 'Recommendations', to: '/app/recommendations', icon: Sparkles },
   { label: 'Asana', to: '/app/asana', icon: GitBranchPlus },
   { label: 'Settings', to: '/app/settings', icon: Cog },

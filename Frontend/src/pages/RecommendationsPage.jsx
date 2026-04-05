@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { RefreshCcw, Sparkles } from 'lucide-react'
+import { toast } from 'sonner'
 import { useParams } from 'react-router-dom'
 import AsanaConnectionBanner from '../components/recommendations/AsanaConnectionBanner.jsx'
 import RecommendationCard from '../components/recommendations/RecommendationCard.jsx'
@@ -21,7 +22,7 @@ export default function RecommendationsPage() {
     refresh: refreshKey ? 'true' : undefined,
   }), [priorityFilter, refreshKey])
   const { recommendations, isLoading, error } = useRecommendations(tenantId, params)
-  const { status, projects } = useAsanaIntegration(tenantId)
+  const { status, projects, sections } = useAsanaIntegration(tenantId)
 
   const filtered = useMemo(() => {
     return recommendations.filter((item) => {
@@ -37,8 +38,17 @@ export default function RecommendationsPage() {
 
   async function handleSendToKanban(recommendationId) {
     const projectId = status?.project_id || projects[0]?.id
-    if (!projectId) return
-    await sendRecommendationToKanban({ tenantId, recommendationId, projectId })
+    const sectionId = status?.section_id || sections[0]?.id
+    if (!projectId) {
+      toast.error('No Asana project configured. Go to the Asana page and save a mapping first.')
+      return
+    }
+    try {
+      await sendRecommendationToKanban({ tenantId, recommendationId, projectId, sectionId })
+      toast.success('Recommendation sent to Asana Kanban')
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err?.message || 'Failed to send to Kanban')
+    }
   }
 
   async function handleDismiss(recommendationId) {
@@ -94,7 +104,7 @@ export default function RecommendationsPage() {
             <RecommendationCard
               key={recommendation.id}
               recommendation={recommendation}
-              asanaConnected={Boolean(status?.connected && status?.project_id && status?.section_id)}
+              asanaConnected={Boolean(status?.connected)}
               onSendToKanban={handleSendToKanban}
               onDismiss={handleDismiss}
             />

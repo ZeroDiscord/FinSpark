@@ -11,6 +11,7 @@ import SectionHeader from '../components/ui/SectionHeader.jsx'
 import { Card, CardContent } from '../components/ui/Card.jsx'
 import { useAsanaIntegration } from '../hooks/useAsanaIntegration.js'
 import { useIntegrationStore } from '../stores/integrationStore.js'
+import { useTenantContext } from '../context/TenantContext.jsx'
 import {
   bulkSendRecommendations,
   fetchAsanaProjects,
@@ -21,7 +22,13 @@ import {
 
 export default function AsanaPage() {
   const params = useParams()
-  const tenantId = params.tenantId || new URLSearchParams(window.location.search).get('tenant_id') || ''
+  const { activeTenant } = useTenantContext()
+  // Prefer active workspace, then URL param (set by OAuth callback), then route param
+  const tenantId =
+    activeTenant?.id ||
+    new URLSearchParams(window.location.search).get('tenant_id') ||
+    params.tenantId ||
+    ''
   const { status, workspaces, projects, sections, isLoading, error } = useAsanaIntegration(tenantId)
   const {
     selectedWorkspace,
@@ -40,21 +47,32 @@ export default function AsanaPage() {
     setSelectedWorkspace(status?.workspace_id || '')
     setSelectedProject(status?.project_id || '')
     setSelectedColumn(status?.section_id || '')
-    setProjectOptions(projects)
-    setSectionOptions(sections)
-  }, [projects, sections, setSelectedColumn, setSelectedProject, setSelectedWorkspace, status])
+  }, [setSelectedColumn, setSelectedProject, setSelectedWorkspace, status])
+
+  // Sync projects from hook into local state whenever hook resolves them
+  useEffect(() => {
+    if (projects.length) setProjectOptions(projects)
+  }, [projects])
 
   useEffect(() => {
-    if (!tenantId || !selectedWorkspace || selectedWorkspace === status?.workspace_id) return
+    if (sections.length) setSectionOptions(sections)
+  }, [sections])
+
+  useEffect(() => {
+    // Load projects whenever workspace changes (including initial load)
+    if (!tenantId || !selectedWorkspace) return
     fetchAsanaProjects(tenantId, selectedWorkspace)
       .then((rows) => {
         setProjectOptions(rows)
-        setSelectedProject('')
-        setSectionOptions([])
-        setSelectedColumn('')
+        // Only clear selection if workspace actually changed
+        if (selectedWorkspace !== status?.workspace_id) {
+          setSelectedProject('')
+          setSectionOptions([])
+          setSelectedColumn('')
+        }
       })
       .catch(() => {})
-  }, [selectedWorkspace, status?.workspace_id, tenantId, setSelectedProject, setSelectedColumn])
+  }, [selectedWorkspace, tenantId, setSelectedProject, setSelectedColumn, status?.workspace_id])
 
   useEffect(() => {
     if (!tenantId || !selectedProject || selectedProject === status?.project_id) return
@@ -120,6 +138,11 @@ export default function AsanaPage() {
         title="Connect recommendations to delivery"
         description="Authorize Asana, choose the destination workspace and project, then send churn recommendations to the right Kanban section."
       />
+      {!tenantId ? (
+        <div className="rounded-3xl border border-amber-400/20 bg-amber-500/10 px-5 py-4 text-sm text-amber-100">
+          Select a workspace first to manage the Asana integration.
+        </div>
+      ) : null}
       {isLoading ? (
         <LoadingSkeleton rows={8} />
       ) : (

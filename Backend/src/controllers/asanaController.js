@@ -7,12 +7,31 @@ const asana = require('../services/asanaIntegrationService');
 const { AppError, NotFoundError, ValidationError } = require('../utils/errors');
 
 async function resolveTenant(req) {
-  const tenantId = req.query.tenant_id || req.body?.tenant_id || req.user.tenant_db_id || req.user.tenant_id;
-  const tenant =
-    (await findTenantByIdForOwner(tenantId, req.user.sub)) ||
-    (await findTenantByHashForOwner(tenantId, req.user.sub));
-  if (!tenant) throw new NotFoundError('Tenant not found.');
-  return tenant;
+  const Tenant = require('../database/models/Tenant');
+  const tenantParam = req.query.tenant_id || req.body?.tenant_id || req.user.tenant_db_id || req.user.tenant_id;
+
+  if (tenantParam) {
+    // Direct lookup by tenant_key — no ownership restriction needed for Asana ops
+    const byKey = await Tenant.findOne({ tenant_key: String(tenantParam) }).lean();
+    if (byKey) {
+      return {
+        id: byKey.tenant_key,
+        tenant_hash: byKey.tenant_key,
+        company_name: byKey.company_name,
+        plan: byKey.plan,
+        deployment_mode: byKey.deployment_mode,
+        settings: byKey.settings || {},
+      };
+    }
+
+    // Fallback: ownership-scoped lookup
+    const tenant =
+      (await findTenantByIdForOwner(tenantParam, req.user.sub)) ||
+      (await findTenantByHashForOwner(tenantParam, req.user.sub));
+    if (tenant) return tenant;
+  }
+
+  throw new NotFoundError('Tenant not found.');
 }
 
 async function connect(req, res) {

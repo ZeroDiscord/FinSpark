@@ -1,7 +1,9 @@
 import {
   BarChart3,
   Boxes,
+  Brain,
   Cog,
+  Database,
   GitBranchPlus,
   LayoutGrid,
   Sparkles,
@@ -12,19 +14,20 @@ import { NavLink } from 'react-router-dom'
 import { useTenantContext } from '../../context/TenantContext.jsx'
 
 const navItems = [
-  { label: 'Workspaces', icon: LayoutGrid, base: '/app/workspaces' },
-  { label: 'Upload', icon: Upload, base: '/app/upload' },
-  { label: 'Features', icon: Boxes, base: '/app/features' },
-  { label: 'Tracking', icon: Workflow, base: '/app/tracking' },
-  { label: 'Dashboard', icon: BarChart3, base: '/app/dashboard' },
-  { label: 'Recommendations', icon: Sparkles, base: '/app/recommendations' },
-  { label: 'Asana', icon: GitBranchPlus, base: '/app/asana' },
-  { label: 'Settings', icon: Cog, base: '/app/settings' },
+  { label: 'Workspaces',      icon: LayoutGrid,    base: '/app/workspaces' },
+  { label: 'Upload',          icon: Upload,         base: '/app/upload' },
+  { label: 'Features',        icon: Boxes,          base: '/app/features' },
+  { label: 'Tracking',        icon: Workflow,       base: '/app/tracking' },
+  { label: 'Dataset',         icon: Database,       base: '/app/dataset' },
+  { label: 'Train',           icon: Brain,          base: '/app/train' },
+  { label: 'Recommendations', icon: Sparkles,       base: '/app/recommendations' },
+  { label: 'Asana',           icon: GitBranchPlus,  base: '/app/asana' },
+  { label: 'Settings',        icon: Cog,            base: '/app/settings' },
 ]
 
 export function resolveTenantPath(base, tenantId) {
   if (!tenantId) return base
-  if (['/app/features', '/app/tracking', '/app/dashboard', '/app/recommendations'].includes(base)) {
+  if (['/app/features', '/app/tracking', '/app/dashboard', '/app/dataset', '/app/train', '/app/recommendations'].includes(base)) {
     return `${base}/${tenantId}`
   }
   return base

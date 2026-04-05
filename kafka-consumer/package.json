@@ -1,0 +1,14 @@
+{
+  "name": "finspark-kafka-consumer",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "mongoose": "^8.4.0",
+    "csv-writer": "^1.6.0"
+  }
+}

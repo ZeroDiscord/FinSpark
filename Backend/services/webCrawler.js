@@ -115,7 +115,7 @@ async function crawlWebsite(url, crawlDepth = 0) {
 
   try {
     const main = await browser.newPage();
-    await main.setDefaultNavigationTimeout(30_000);
+    await main.setDefaultNavigationTimeout(60_000);
 
     await Promise.race([
       main.goto(url, { waitUntil: 'networkidle2' }),

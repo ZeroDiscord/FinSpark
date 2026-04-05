@@ -9,17 +9,37 @@ const {
 const { NotFoundError } = require('../utils/errors');
 
 async function resolveTenantFromQueryOrAuth(req) {
-  if (req.query.tenant_id) {
-    const tenant =
-      (await findTenantByHashForOwner(req.query.tenant_id, req.user.sub)) ||
-      (await findTenantByIdForOwner(req.query.tenant_id, req.user.sub));
-    if (!tenant) throw new NotFoundError('Tenant not found.');
-    return tenant;
+  const Tenant = require('../database/models/Tenant');
+
+  function normalizeTenantDoc(doc) {
+    if (!doc) return null;
+    return {
+      id: doc.tenant_key,
+      tenant_hash: doc.tenant_key,
+      company_name: doc.company_name,
+      plan: doc.plan,
+      ml_trained: Boolean(doc.ml_trained),
+      trained_at: doc.trained_at || null,
+      created_at: doc.createdAt || doc.created_at || null,
+      deployment_mode: doc.deployment_mode,
+      status: doc.status,
+      settings: doc.settings || {},
+    };
   }
 
-  const tenant = await findTenantByIdForOwner(req.user.tenant_db_id, req.user.sub);
-  if (!tenant) throw new NotFoundError('Tenant not found.');
-  return tenant;
+  const tenantParam = req.query.tenant_id || req.user.tenant_db_id;
+  if (tenantParam) {
+    // Try by tenant_key first (most common), then try ownership-scoped lookups as fallback
+    const byKey = await Tenant.findOne({ tenant_key: String(tenantParam) }).lean();
+    if (byKey) return normalizeTenantDoc(byKey);
+
+    const tenant =
+      (await findTenantByHashForOwner(tenantParam, req.user.sub)) ||
+      (await findTenantByIdForOwner(tenantParam, req.user.sub));
+    if (tenant) return tenant;
+  }
+
+  throw new NotFoundError('Tenant not found.');
 }
 
 async function getDashboard(req, res) {

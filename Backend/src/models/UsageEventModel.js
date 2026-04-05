@@ -2,6 +2,8 @@
 
 const UsageEvent = require('../database/models/UsageEvent');
 
+const BATCH_SIZE = 500;
+
 async function insertUsageEvents(tenantId, rows) {
   if (!rows.length) return [];
 
@@ -24,7 +26,10 @@ async function insertUsageEvents(tenantId, rows) {
     churn_label: row.churn_label,
   }));
 
-  await UsageEvent.insertMany(docs, { ordered: false });
+  // Insert in batches to avoid MongoDB driver payload limits
+  for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+    await UsageEvent.insertMany(docs.slice(i, i + BATCH_SIZE), { ordered: false });
+  }
   return rows;
 }
 

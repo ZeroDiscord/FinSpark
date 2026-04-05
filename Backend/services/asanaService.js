@@ -36,23 +36,31 @@ function getAuthUrl(state) {
     client_id: config.asana.clientId,
     redirect_uri: config.asana.redirectUri,
     response_type: 'code',
-    scope: 'default',
     state,
   });
   return `${ASANA_AUTH}?${params.toString()}`;
 }
 
 async function exchangeCode(code) {
-  const res = await axios.post(ASANA_TOKEN_URL, new URLSearchParams({
-    grant_type: 'authorization_code',
-    client_id: config.asana.clientId,
-    client_secret: config.asana.clientSecret,
-    redirect_uri: config.asana.redirectUri,
-    code,
-  }).toString(), {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  });
-  return res.data; // { access_token, refresh_token, expires_in, token_type }
+  try {
+    const res = await axios.post(
+      ASANA_TOKEN_URL,
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        redirect_uri: config.asana.redirectUri,
+        code,
+      }).toString(),
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        auth: { username: config.asana.clientId, password: config.asana.clientSecret },
+      }
+    );
+    return res.data;
+  } catch (err) {
+    const detail = err.response?.data;
+    logger.error({ event: 'asana_exchange_failed', status: err.response?.status, detail });
+    throw Object.assign(new Error(`Asana token exchange failed: ${JSON.stringify(detail)}`), { status: 502 });
+  }
 }
 
 async function getWorkspace(accessToken) {

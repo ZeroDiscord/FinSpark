@@ -9,6 +9,7 @@ const config = require('../../../config');
 const logger = require('../../../utils/logger');
 const { buildFeatureCandidates } = require('./candidateBuilder');
 const { toHierarchy } = require('./hierarchy');
+const { extractFeaturesWithAI } = require('./aiFeatureExtractor');
 
 function runProcess(command, args) {
   return new Promise((resolve, reject) => {
@@ -170,26 +171,68 @@ async function parseNavigationSignals(apktoolDir) {
   return items;
 }
 
+async function collectSignals(apktoolDir, jadxDir) {
+  const manifestSignals = await parseManifestSignals(apktoolDir);
+  const layoutSignals = await parseLayoutSignals(apktoolDir);
+  const sourceSignals = await parseSourceSignals(jadxDir);
+  const navSignals = await parseNavigationSignals(apktoolDir);
+
+  const activityNames = manifestSignals.map((s) => s.raw);
+  const fragmentNames = sourceSignals.filter((s) => s.evidence.type === 'fragment').map((s) => s.raw);
+  const navLabels = navSignals.map((s) => s.raw);
+  const apiPaths = sourceSignals.filter((s) => s.evidence.type === 'api_path').map((s) => s.raw);
+  const layoutStrings = layoutSignals
+    .filter((s) => ['button_text', 'toolbar_title', 'form_label'].includes(s.evidence.type))
+    .map((s) => s.raw);
+  const sourceSnippets = sourceSignals
+    .filter((s) => s.evidence.type === 'toolbar_title')
+    .map((s) => s.raw);
+
+  return {
+    allRaw: [...manifestSignals, ...layoutSignals, ...sourceSignals, ...navSignals],
+    apkSignals: { activityNames, fragmentNames, navLabels, apiPaths, layoutStrings, sourceSnippets },
+  };
+}
+
 async function detectFeaturesFromApk(apkPath, uploadId = null) {
   const { apktoolDir, jadxDir } = await decompile(apkPath);
 
   try {
-    const rawItems = [
-      ...(await parseManifestSignals(apktoolDir)),
-      ...(await parseLayoutSignals(apktoolDir)),
-      ...(await parseSourceSignals(jadxDir)),
-      ...(await parseNavigationSignals(apktoolDir)),
-    ];
+    const { allRaw, apkSignals } = await collectSignals(apktoolDir, jadxDir);
 
-    const features = buildFeatureCandidates(rawItems, 'apk');
+    // Try AI-powered extraction first; fall back to rule-based on error
+    let features;
+    let extractionMode = 'ai';
+    try {
+      const aiFeatures = await extractFeaturesWithAI(apkSignals);
+      if (aiFeatures.length > 0) {
+        features = aiFeatures.map((f, index) => ({
+          ...f,
+          id: `ai_${index + 1}`,
+          upload_id: uploadId,
+          raw_name: f.clean_name,
+          raw_names: [f.clean_name],
+          evidence: [],
+        }));
+      } else {
+        throw new Error('AI returned no features');
+      }
+    } catch (aiError) {
+      logger.warn({ event: 'ai_extraction_fallback', error: aiError.message });
+      extractionMode = 'rules';
+      const candidates = buildFeatureCandidates(allRaw, 'apk');
+      features = toHierarchy(candidates, 'apk', uploadId);
+    }
+
     return {
       source_type: 'apk',
+      extraction_mode: extractionMode,
       summary: {
-        files_parsed: rawItems.length,
-        detected_count: rawItems.length,
+        files_parsed: allRaw.length,
+        detected_count: allRaw.length,
         deduplicated_count: features.length,
       },
-      features: toHierarchy(features, 'apk', uploadId),
+      features,
     };
   } finally {
     try { fs.rmSync(apktoolDir, { recursive: true, force: true }); } catch {}

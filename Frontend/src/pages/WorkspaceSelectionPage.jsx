@@ -1,32 +1,122 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ArrowRight, Building2, FolderOpen, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../components/ui/Button.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import LoadingSkeleton from '../components/ui/LoadingSkeleton.jsx'
+import Modal from '../components/ui/Modal.jsx'
 import SectionHeader from '../components/ui/SectionHeader.jsx'
 import { Card, CardContent } from '../components/ui/Card.jsx'
 import { useWorkspaceSelection } from '../hooks/useWorkspaceSelection.js'
 import { useTenantContext } from '../context/TenantContext.jsx'
+import { signUp } from '../services/authService.js'
+
+const EMPTY_FORM = { full_name: '', company_name: '', email: '', password: '' }
 
 export default function WorkspaceSelectionPage() {
   const navigate = useNavigate()
-  const { tenants, isLoadingTenants, tenantError } = useWorkspaceSelection()
+  const { tenants, isLoadingTenants, tenantError, reload } = useWorkspaceSelection()
   const { setActiveTenant } = useTenantContext()
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
 
   function handleSelect(tenant) {
     setActiveTenant(tenant)
-    navigate(`/app/upload`)
+    navigate(`/app/dashboard/${tenant.id}`)
+  }
+
+  function handleChange(e) {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setSubmitting(true)
+    setFormError('')
+    try {
+      await signUp(form)
+      setModalOpen(false)
+      setForm(EMPTY_FORM)
+      reload()
+    } catch (err) {
+      setFormError(err.message || 'Failed to create workspace.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <div className="space-y-8">
+      <Modal
+        open={modalOpen}
+        onOpenChange={(open) => { setModalOpen(open); if (!open) { setForm(EMPTY_FORM); setFormError('') } }}
+        title="Request a workspace"
+        description="A new tenant workspace will be provisioned for your organisation."
+      >
+        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input
+              name="full_name"
+              value={form.full_name}
+              onChange={handleChange}
+              placeholder="Full name"
+              className="h-11 rounded-2xl border border-white/10 bg-slate-950/70 px-4 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-400/40"
+            />
+            <input
+              name="company_name"
+              value={form.company_name}
+              onChange={handleChange}
+              placeholder="Company / tenant name"
+              required
+              className="h-11 rounded-2xl border border-white/10 bg-slate-950/70 px-4 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-400/40"
+            />
+            <input
+              name="email"
+              type="email"
+              value={form.email}
+              onChange={handleChange}
+              placeholder="Work email"
+              required
+              className="h-11 rounded-2xl border border-white/10 bg-slate-950/70 px-4 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-400/40 sm:col-span-2"
+            />
+            <input
+              name="password"
+              type="password"
+              value={form.password}
+              onChange={handleChange}
+              placeholder="Password"
+              required
+              minLength={8}
+              className="h-11 rounded-2xl border border-white/10 bg-slate-950/70 px-4 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-400/40 sm:col-span-2"
+            />
+          </div>
+          {formError && (
+            <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+              {formError}
+            </div>
+          )}
+          <div className="flex justify-end gap-3 pt-1">
+            <Button type="button" variant="secondary" onClick={() => setModalOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={submitting} className="gap-2">
+              <Plus className="h-4 w-4" />
+              {submitting ? 'Creating…' : 'Create workspace'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
       <SectionHeader
         eyebrow="Workspace selection"
         title="Choose a project workspace"
         description="Use your tenant as the operating workspace for uploads, feature mapping, analytics, and recommendation workflows."
         actions={
-          <Button variant="secondary" className="gap-2">
+          <Button variant="secondary" className="gap-2" onClick={() => setModalOpen(true)}>
             <Plus className="h-4 w-4" />
             Request workspace
           </Button>

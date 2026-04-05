@@ -12,8 +12,12 @@ export async function dismissRecommendation(tenantId, recommendationId) {
   return dismissApi(tenantId, recommendationId)
 }
 
-export async function sendRecommendationToKanban({ tenantId, recommendationId, projectId }) {
+export async function sendRecommendationToKanban({ tenantId, recommendationId, projectId, sectionId }) {
   return client
-    .post(`/recommendations/${recommendationId}/send-to-asana`, { project_id: projectId }, { params: { tenant_id: tenantId } })
+    .post(
+      `/recommendations/${recommendationId}/send-to-asana`,
+      { project_id: projectId, section_id: sectionId },
+      { params: { tenant_id: tenantId } }
+    )
     .then((r) => r.data)
 }

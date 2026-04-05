@@ -15,7 +15,9 @@ function requireAuth(req, _res, next) {
     return next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
-      return next(new UnauthorizedError('Token expired.'));
+      const err = new UnauthorizedError('Token expired.');
+      err.code = 'TOKEN_EXPIRED';
+      return next(err);
     }
     return next(new UnauthorizedError('Invalid token.'));
   }

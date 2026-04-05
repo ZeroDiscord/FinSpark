@@ -50,11 +50,16 @@ async function getOrCreateRecommendations(tenant) {
   }));
 }
 
+async function findAsanaConnection(tenantId) {
+  const AsanaConnection = require('../database/models/AsanaConnection');
+  return AsanaConnection.findOne({ tenant_id: String(tenantId) });
+}
+
 async function sendRecommendationToAsana(tenantId, recommendationId, projectId) {
   const recommendation = await findRecommendationById(tenantId, recommendationId);
   if (!recommendation) throw new NotFoundError('Recommendation not found.');
 
-  const connection = await asanaIntegrationService.getConnection(tenantId);
+  const connection = await findAsanaConnection(tenantId);
   if (!connection) throw new AsanaConnectionMissingError();
 
   const task = await asanaIntegrationService.createTask(tenantId, {

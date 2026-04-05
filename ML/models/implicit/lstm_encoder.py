@@ -331,7 +331,7 @@ class LSTMTrainer:
         best_val_loss = float("inf")
         epochs_without_improvement = 0
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer, mode="min", factor=0.5, patience=2, verbose=False
+            self.optimizer, mode="min", factor=0.5, patience=2
         )
 
         for epoch in range(1, epochs + 1):

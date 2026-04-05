@@ -9,12 +9,24 @@ const {
 const { NotFoundError } = require('../utils/errors');
 
 async function resolveTenant(req) {
-  const tenantId = req.query.tenant_id || req.user.tenant_db_id;
-  const tenant =
-    (await findTenantByIdForOwner(tenantId, req.user.sub)) ||
-    (await findTenantByHashForOwner(tenantId, req.user.sub));
-  if (!tenant) throw new NotFoundError('Tenant not found.');
-  return tenant;
+  const Tenant = require('../database/models/Tenant');
+  const tenantParam = req.query.tenant_id || req.user.tenant_db_id;
+
+  if (tenantParam) {
+    const byKey = await Tenant.findOne({ tenant_key: String(tenantParam) }).lean();
+    if (byKey) {
+      return {
+        id: byKey.tenant_key,
+        tenant_hash: byKey.tenant_key,
+        company_name: byKey.company_name,
+      };
+    }
+    const tenant =
+      (await findTenantByIdForOwner(tenantParam, req.user.sub)) ||
+      (await findTenantByHashForOwner(tenantParam, req.user.sub));
+    if (tenant) return tenant;
+  }
+  throw new NotFoundError('Tenant not found.');
 }
 
 async function list(req, res) {

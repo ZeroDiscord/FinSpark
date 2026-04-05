@@ -37,6 +37,17 @@ export function useDashboardData(tenantId, filters) {
       fetchJourneys(tenantId, filters),
     ]).then(([overview, featureUsage, churn, funnel, trend, dropoffRows, journeys]) => {
       if (cancelled) return
+      const anyFailed = [overview, featureUsage, churn, funnel, trend, dropoffRows, journeys].some(
+        (r) => r.status === 'rejected'
+      )
+      const allFailed = [overview, featureUsage].every((r) => r.status === 'rejected')
+      const firstError = [overview, featureUsage, churn, funnel, trend, dropoffRows, journeys]
+        .find((r) => r.status === 'rejected')
+        ?.reason
+      const errorMsg = allFailed
+        ? (firstError?.response?.data?.error || firstError?.message || 'Unable to load dashboard data.')
+        : ''
+
       setState({
         overview: overview.status === 'fulfilled' ? overview.value : null,
         featureUsage: featureUsage.status === 'fulfilled' ? featureUsage.value : [],
@@ -46,10 +57,7 @@ export function useDashboardData(tenantId, filters) {
         trend: trend.status === 'fulfilled' ? trend.value : null,
         dropoffRows: dropoffRows.status === 'fulfilled' ? dropoffRows.value : [],
         isLoading: false,
-        error:
-          overview.status === 'rejected' && featureUsage.status === 'rejected'
-            ? 'Unable to load dashboard data.'
-            : '',
+        error: errorMsg,
       })
     })
 
