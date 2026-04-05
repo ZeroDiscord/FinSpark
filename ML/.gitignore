@@ -128,12 +128,23 @@ venv.bak/
 
 # Project Specific
 data/chromadb/
+data/vectorstore/
+data/models/
 data/*.db
 data/*.csv
+data/**/*.csv
+data/synthetic/*.csv
 models/latent/*.pt
 models/latent/*.pth
 models/latent/*.pkl
 models/explicit/*.pkl
+*.pt
+*.pth
+*.pkl
+*.ckpt
+*.safetensors
+*.onnx
+*.bin
 reports/
 logs/
 .vscode/

@@ -1,8 +1,82 @@
-node_modules/ 
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
 dist/
 build/
-.env
-.DS_Store
+dist-ssr/
+Frontend/dist/
 
-# Logs
-logs
+# ── Environment & secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.sw?
+
+# ── Uploaded files (runtime-generated, can be large) ─────────────────────────
+uploads/
+Backend/uploads/
+datasets/
+
+# ── ML model binaries & checkpoints ──────────────────────────────────────────
+*.pt
+*.pth
+*.pkl
+*.ckpt
+*.safetensors
+*.onnx
+*.bin
+
+# ── ML vectorstore (Chroma binary shards) ────────────────────────────────────
+ML/data/vectorstore/
+ML/data/models/
+ML/data/synthetic/*.csv
+
+# ── CSV datasets (generated / large event data) ──────────────────────────────
+ML/data/*.csv
+Backend/uploads/csv/
+datasets/*.csv
+
+# ── SQLite databases ──────────────────────────────────────────────────────────
+*.sqlite3
+*.db
+*.sqlite
+
+# ── Python compiled bytecode ──────────────────────────────────────────────────
+ML/models/**/__pycache__/
+ML/api/__pycache__/
+**/__pycache__/
+
+# ── Coverage / test artifacts ─────────────────────────────────────────────────
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.tox/
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Docker volumes / local infra ─────────────────────────────────────────────
+.docker-data/
+mongo-data/
