@@ -21,7 +21,7 @@ const navItems = [
   { label: 'Dataset',         icon: Database,      base: '/app/dataset' },
   { label: 'Intelligence',    icon: Network,       base: '/app/intelligence', id: 'tour-nav-intelligence' },
   { label: 'Recommendations', icon: Sparkles,      base: '/app/recommendations' },
-  { label: 'Asana',           icon: GitBranchPlus, base: '/app/asana' },
+  { label: 'Asana',           icon: GitBranchPlus, base: '/app/asana', id: 'tour-nav-asana' },
   { label: 'Settings',        icon: Cog,           base: '/app/settings' },
 ]
 

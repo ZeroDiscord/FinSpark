@@ -5,6 +5,7 @@ import Button from './Button.jsx'
 export default function TourTooltip({
   index,
   step,
+  size,
   tooltipProps,
   primaryProps,
   backProps,
@@ -17,11 +18,14 @@ export default function TourTooltip({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 10, scale: 0.95 }}
       {...tooltipProps}
-      className="z-[99999] w-80 max-w-[90vw] overflow-hidden rounded-3xl border border-white/10 bg-slate-950/90 p-5 backdrop-blur-xl shadow-2xl shadow-indigo-500/10"
+      className="relative z-[99999] w-80 max-w-[90vw] overflow-hidden rounded-[2rem] border border-white/20 bg-slate-900/40 p-6 backdrop-blur-[40px] saturate-150 shadow-[0_16px_60px_-12px_rgba(56,189,248,0.4)]"
     >
-      <div className="flex items-start justify-between gap-3 mb-4">
+      <div className="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-cyan-400/30 blur-[40px]" />
+      <div className="absolute -bottom-20 -left-20 h-40 w-40 rounded-full bg-indigo-500/30 blur-[40px]" />
+
+      <div className="relative z-10 flex items-start justify-between gap-3 mb-4">
         {step.title && (
-          <h3 className="text-lg font-semibold text-white">{step.title}</h3>
+          <h3 className="text-xl font-bold bg-gradient-to-br from-white to-white/70 bg-clip-text text-transparent">{step.title}</h3>
         )}
         <button
           {...closeProps}
@@ -31,17 +35,17 @@ export default function TourTooltip({
         </button>
       </div>
       
-      <div className="text-sm text-slate-300 leading-relaxed mb-6">
+      <div className="relative z-10 text-sm text-slate-300/90 leading-relaxed mb-6 font-medium">
         {step.content}
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="relative z-10 flex items-center justify-between">
         <div className="flex gap-1.5">
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: size }).map((_, i) => (
             <div
               key={i}
-              className={`h-1.5 w-1.5 rounded-full transition-colors ${
-                i === index ? 'bg-cyan-400' : 'bg-white/20'
+              className={`h-2 w-2 rounded-full transition-colors ${
+                i === index ? 'bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.8)]' : 'bg-white/20'
               }`}
             />
           ))}

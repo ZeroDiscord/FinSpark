@@ -37,6 +37,7 @@ import {
 } from '../components/intelligence/IntelligenceCharts.jsx'
 import EnsembleBars from '../components/intelligence/EnsembleBars.jsx'
 import FeatureTable from '../components/intelligence/FeatureTable.jsx'
+import FeatureAdoptionHeatmap from '../components/intelligence/FeatureAdoptionHeatmap.jsx'
 
 import PathFlowGraph from '../components/intelligence/PathFlowGraph.jsx'
 import SessionRibbons from '../components/intelligence/SessionRibbons.jsx'
@@ -191,13 +192,14 @@ function FilterPill({ label, active, onClick }) {
 // ─── Default card order ───────────────────────────────────────────────────────
 const DEFAULT_CARDS = [
   'flow',
+  'table',
+  'ensemble',
+  'heatmap',
   'ribbons',
   'funnel',
   'churn-hist',
   'env',
   'criticality',
-  'table',
-  'ensemble',
 ]
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -287,6 +289,16 @@ export default function IntelligencePage() {
               featureUsage={data.featureUsage}
               friction={data.friction}
             />
+          </div>
+        </DashCard>
+      </SortableCard>
+    ),
+
+    heatmap: (
+      <SortableCard key="heatmap" id="heatmap" className="col-span-full">
+        <DashCard eyebrow="Adoption" title="Feature Adoption Heatmap" accent="emerald" collapsible>
+          <div className="px-5 pb-5">
+            <FeatureAdoptionHeatmap featureUsage={data.featureUsage} />
           </div>
         </DashCard>
       </SortableCard>
@@ -483,33 +495,34 @@ export default function IntelligencePage() {
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={cardOrder} strategy={verticalListSortingStrategy}>
-            {/* Row 1 — Full-width flow graph */}
+            {/* Row 1 — Full-width */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: 0.05 }}
+              className="mb-5"
             >
-              {cardMap[cardOrder[0]] /* flow */}
+              {cardMap[cardOrder[0]]}
             </motion.div>
 
-            {/* Row 2 — 2-col */}
+            {/* Row 2 — 2-col (Table & Ensemble USPs) */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: 0.1 }}
-              className="grid gap-5 lg:grid-cols-2"
+              className="mb-5 grid gap-5 xl:grid-cols-2"
             >
               {cardOrder.slice(1, 3).map((id) => cardMap[id])}
             </motion.div>
 
-            {/* Row 3 — 3-col */}
+            {/* Row 3 — Full-width Heatmap */}
             <motion.div
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: 0.15 }}
-              className="grid gap-5 lg:grid-cols-3"
+              className="mb-5 grid gap-5 lg:grid-cols-1"
             >
-              {cardOrder.slice(3, 6).map((id) => cardMap[id])}
+              {cardMap[cardOrder[3]]}
             </motion.div>
 
             {/* Row 4 — 2-col */}
@@ -517,9 +530,19 @@ export default function IntelligencePage() {
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: 0.2 }}
+              className="grid gap-5 lg:grid-cols-3"
+            >
+              {cardOrder.slice(4, 7).map((id) => cardMap[id])}
+            </motion.div>
+
+            {/* Row 5 — 2-col */}
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.25 }}
               className="grid gap-5 lg:grid-cols-2"
             >
-              {cardOrder.slice(6).map((id) => cardMap[id])}
+              {cardOrder.slice(7).map((id) => cardMap[id])}
             </motion.div>
           </SortableContext>
         </DndContext>

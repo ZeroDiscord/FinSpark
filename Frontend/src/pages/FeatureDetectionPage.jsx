@@ -12,6 +12,8 @@ import FeatureSummaryStats from '../components/features/FeatureSummaryStats.jsx'
 import FeatureTree from '../components/features/FeatureTree.jsx'
 import { getFeatures } from '../api/features.api.js'
 import { fetchRecommendations } from '../services/recommendationService.js'
+import { getFeatureUsage } from '../api/intelligence.api.js'
+import FeatureAdoptionHeatmap from '../components/features/FeatureAdoptionHeatmap.jsx'
 
 function buildTree(features) {
   const domains = new Map()
@@ -42,8 +44,11 @@ function buildTree(features) {
   return [...domains.values()]
 }
 
-function mergeFeatureSources(detectedFeatures, recommendations) {
+function mergeFeatureSources(detectedFeatures, recommendations, featureUsage = []) {
   const merged = new Map()
+
+  const usageMap = new Map()
+  featureUsage.forEach((u) => usageMap.set((u.feature || '').toLowerCase(), u))
 
   detectedFeatures.forEach((feature, index) => {
     const key = String(feature.l3_feature || feature.name || `feature-${index}`).toLowerCase()
@@ -81,7 +86,19 @@ function mergeFeatureSources(detectedFeatures, recommendations) {
     })
   })
 
-  return [...merged.values()]
+  // Attach usage data
+  const mergedList = [...merged.values()]
+  mergedList.forEach((feature) => {
+    const key = String(feature.name || feature.l3_feature).toLowerCase()
+    const usage = usageMap.get(key)
+    if (usage) {
+      feature.usage_count = usage.usage_count
+      feature.success_rate = usage.success_rate
+      feature.churn_rate = usage.churn_rate
+    }
+  })
+
+  return mergedList
 }
 
 export default function FeatureDetectionPage() {
@@ -102,13 +119,21 @@ export default function FeatureDetectionPage() {
     Promise.allSettled([
       getFeatures(tenantId),
       fetchRecommendations(tenantId),
+      getFeatureUsage(tenantId),
     ])
-      .then(([featuresResult, recommendationsResult]) => {
+      .then(([featuresResult, recommendationsResult, usageResult]) => {
         const features =
           featuresResult.status === 'fulfilled' ? (featuresResult.value.features || []) : []
         const recommendations =
           recommendationsResult.status === 'fulfilled' ? (recommendationsResult.value || []) : []
-        const mergedFeatures = mergeFeatureSources(features, recommendations)
+        const usageData = 
+          usageResult.status === 'fulfilled'
+            ? Array.isArray(usageResult.value)
+              ? usageResult.value
+              : usageResult.value?.rows || []
+            : []
+          
+        const mergedFeatures = mergeFeatureSources(features, recommendations, usageData)
 
         setData(mergedFeatures)
         setExpandedNodes(buildTree(mergedFeatures).map((node) => node.id))
@@ -175,6 +200,7 @@ export default function FeatureDetectionPage() {
             categories={new Set(filtered.map((item) => item.l1_domain)).size}
             treeDepth={3}
           />
+          <FeatureAdoptionHeatmap features={filtered} />
           <div className="grid gap-4 xl:grid-cols-[0.34fr_0.66fr]">
             <Card>
               <CardContent className="space-y-4">

@@ -27,7 +27,7 @@ const TOUR_STEPS = [
   {
     target: '#tour-nav-upload',
     title: 'Bring Your Data',
-    content: 'Upload mock datasets mapped to UI elements to identify user behavior and conversion flows.',
+    content: 'Upload pre compiled datasets.',
     placement: 'right',
     disableBeacon: true,
   },
@@ -35,6 +35,13 @@ const TOUR_STEPS = [
     target: '#tour-nav-intelligence',
     title: 'Intelligence & Analytics',
     content: 'Leverage ML-driven insights predicting user churn, feature adoption, and behavioral patterns.',
+    placement: 'right',
+    disableBeacon: true,
+  },
+  {
+    target: '#tour-nav-asana',
+    title: 'Asana Integration',
+    content: 'Automatically sync your ML anomalies and strategic recommendations directly to your Asana boards.',
     placement: 'right',
     disableBeacon: true,
   }
@@ -47,6 +54,9 @@ export default function OnboardingTour() {
     const isCompleted = localStorage.getItem('finspark_tour_completed')
     // A small delay to let the DOM settle before showing the tour
     if (!isCompleted) {
+      // Mark as completed immediately to prevent re-runs on refresh
+      // even if the user hasn't explicitly clicked 'skip' or finished yet
+      localStorage.setItem('finspark_tour_completed', 'true')
       setTimeout(() => {
         setRun(true)
       }, 500)
