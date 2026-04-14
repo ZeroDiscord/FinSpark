@@ -38,7 +38,7 @@ from pydantic import BaseModel, Field
 # Bootstrap
 # ---------------------------------------------------------------------------
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"))
 
 # Add both the ML package root and repo root so imports work whether the app is
 # launched from FinSpark/ or FinSpark/ML/.

@@ -37,9 +37,6 @@ export function useDashboardData(tenantId, filters) {
       fetchJourneys(tenantId, filters),
     ]).then(([overview, featureUsage, churn, funnel, trend, dropoffRows, journeys]) => {
       if (cancelled) return
-      const anyFailed = [overview, featureUsage, churn, funnel, trend, dropoffRows, journeys].some(
-        (r) => r.status === 'rejected'
-      )
       const allFailed = [overview, featureUsage].every((r) => r.status === 'rejected')
       const firstError = [overview, featureUsage, churn, funnel, trend, dropoffRows, journeys]
         .find((r) => r.status === 'rejected')

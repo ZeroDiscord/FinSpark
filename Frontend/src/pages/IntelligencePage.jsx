@@ -26,23 +26,22 @@ import {
   Users,
   Zap,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getInsight } from '../api/intelligence.api.js'
 import {
   ChurnDistributionChart,
   ConversionFunnelChart,
-  DailyTrendChart,
   EnvironmentDemographicsChart,
   FeatureCriticalityPolarChart,
 } from '../components/intelligence/IntelligenceCharts.jsx'
 import EnsembleBars from '../components/intelligence/EnsembleBars.jsx'
 import FeatureTable from '../components/intelligence/FeatureTable.jsx'
-import InsightPanel from '../components/intelligence/InsightPanel.jsx'
+
 import PathFlowGraph from '../components/intelligence/PathFlowGraph.jsx'
 import SessionRibbons from '../components/intelligence/SessionRibbons.jsx'
 import SortableCard from '../components/intelligence/SortableCard.jsx'
-import TransitionMatrix from '../components/intelligence/TransitionMatrix.jsx'
+
 import SectionHeader from '../components/ui/SectionHeader.jsx'
 import { useIntelligenceData } from '../hooks/useIntelligenceData.js'
 
@@ -72,7 +71,6 @@ function getPhaseMeta(n = 0) {
 
 // ─── Card wrapper ─────────────────────────────────────────────────────────────
 function DashCard({
-  id,
   title,
   eyebrow,
   children,
@@ -196,12 +194,9 @@ const DEFAULT_CARDS = [
   'ribbons',
   'funnel',
   'churn-hist',
-  'trend',
   'env',
   'criticality',
-  'matrix',
   'table',
-  'insight',
   'ensemble',
 ]
 
@@ -252,12 +247,24 @@ export default function IntelligencePage() {
     return true
   })
 
-  const churnRate = data.churnDist?.churn_rate ?? null
+  const totalSessions =
+    data.kpis?.total_sessions ??
+    data.churnDist?.total_sessions ??
+    data.overview?.n_sessions ??
+    null
+  const churnRate =
+    data.kpis?.churn_rate ??
+    data.churnDist?.churn_rate ??
+    data.overview?.churn_rate ??
+    null
   const convRate = churnRate !== null ? 1 - churnRate : null
-  const avgDuration = data.sessions?.length
-    ? Math.round(data.sessions.reduce((s, x) => s + (x.duration_sec || 0), 0) / data.sessions.length)
-    : null
-  const phase = getPhaseMeta(data.overview?.n_sessions)
+  const avgDuration =
+    data.kpis?.avg_session_duration_ms
+      ? Math.round(data.kpis.avg_session_duration_ms / 1000)
+      : data.sessions?.length
+        ? Math.round(data.sessions.reduce((s, x) => s + (x.duration_sec || 0), 0) / data.sessions.length)
+        : null
+  const phase = getPhaseMeta(totalSessions || 0)
   const criticalFriction = (data.friction || []).filter(
     (f) => f.severity === 'critical' || f.severity === 'high'
   ).length
@@ -298,7 +305,7 @@ export default function IntelligencePage() {
               />
             ))}
           </div>
-          <SessionRibbons sessions={filteredSessions.slice(0, 10)} />
+          <SessionRibbons sessions={filteredSessions} />
         </DashCard>
       </SortableCard>
     ),
@@ -307,6 +314,7 @@ export default function IntelligencePage() {
       <SortableCard key="funnel" id="funnel">
         <DashCard eyebrow="Conversion" title="Global Conversion Funnel" accent="emerald" collapsible>
           <ConversionFunnelChart
+            funnel={data.funnel}
             funnelEdges={data.funnelEdges}
             featureUsage={data.featureUsage}
           />
@@ -318,14 +326,6 @@ export default function IntelligencePage() {
       <SortableCard key="churn-hist" id="churn-hist">
         <DashCard eyebrow="BiLSTM Model" title="Churn Probability Distribution" accent="rose" collapsible>
           <ChurnDistributionChart churnDist={data.churnDist} />
-        </DashCard>
-      </SortableCard>
-    ),
-
-    trend: (
-      <SortableCard key="trend" id="trend">
-        <DashCard eyebrow="Temporal" title="Daily Conversion Trend" accent="indigo" collapsible>
-          <DailyTrendChart churnDist={data.churnDist} overview={data.overview} />
         </DashCard>
       </SortableCard>
     ),
@@ -350,13 +350,6 @@ export default function IntelligencePage() {
       </SortableCard>
     ),
 
-    matrix: (
-      <SortableCard key="matrix" id="matrix">
-        <DashCard eyebrow="Markov Chain" title="State Transition Matrix" accent="amber" collapsible>
-          <TransitionMatrix data={data.transitionMatrix} friction={data.friction} />
-        </DashCard>
-      </SortableCard>
-    ),
 
     table: (
       <SortableCard key="table" id="table">
@@ -366,20 +359,6 @@ export default function IntelligencePage() {
       </SortableCard>
     ),
 
-    insight: (
-      <SortableCard key="insight" id="insight">
-        <DashCard eyebrow="AI Insight" title="Churn Intelligence Report" accent="rose" collapsible>
-          <InsightPanel
-            overview={data.overview}
-            friction={data.friction}
-            featureUsage={data.featureUsage}
-            churnDist={data.churnDist}
-            insight={insightText}
-            insightLoading={insightLoading}
-          />
-        </DashCard>
-      </SortableCard>
-    ),
 
     ensemble: (
       <SortableCard key="ensemble" id="ensemble">
@@ -422,17 +401,17 @@ export default function IntelligencePage() {
       >
         <KpiCard
           label="Total Sessions"
-          value={data.overview?.n_sessions?.toLocaleString()}
+          value={totalSessions?.toLocaleString()}
           icon={Users}
           color="text-white"
-          sub="training corpus"
+          sub="from current dataset"
         />
         <KpiCard
           label="Conversion Rate"
           value={convRate !== null ? `${(convRate * 100).toFixed(1)}%` : null}
           icon={Activity}
           color="text-emerald-400"
-          sub={convRate !== null ? `${(churnRate * 100).toFixed(1)}% churn` : undefined}
+          sub={convRate !== null ? `${(churnRate * 100).toFixed(1)}% dataset churn` : undefined}
         />
         <KpiCard
           label="Churn Rate"
@@ -440,14 +419,14 @@ export default function IntelligencePage() {
           icon={TrendingDown}
           color="text-rose-400"
           pulse={churnRate !== null && churnRate > 0.3}
-          sub="BiLSTM predicted"
+          sub="current dataset"
         />
         <KpiCard
           label="Avg Session"
           value={avgDuration !== null ? `${avgDuration}s` : null}
           icon={Clock}
           color="text-slate-200"
-          sub="duration"
+          sub="dataset average"
         />
         <KpiCard
           label="Friction Nodes"
@@ -461,7 +440,7 @@ export default function IntelligencePage() {
           value={data.overview?.lstm_val_auc ? data.overview.lstm_val_auc.toFixed(4) : null}
           icon={Brain}
           color={data.overview?.lstm_val_auc > 0.75 ? 'text-emerald-400' : 'text-amber-400'}
-          sub="val accuracy"
+          sub="validation AUC"
         />
         <div className="flex items-center gap-2 rounded-2xl border border-white/8 bg-slate-900/50 px-4 py-3 backdrop-blur">
           <span className={`h-2 w-2 animate-pulse rounded-full ${phase.dot}`} />
@@ -540,17 +519,7 @@ export default function IntelligencePage() {
               transition={{ duration: 0.35, delay: 0.2 }}
               className="grid gap-5 lg:grid-cols-2"
             >
-              {cardOrder.slice(6, 8).map((id) => cardMap[id])}
-            </motion.div>
-
-            {/* Row 5 — 3-col */}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.25 }}
-              className="grid gap-5 lg:grid-cols-3"
-            >
-              {cardOrder.slice(8).map((id) => cardMap[id])}
+              {cardOrder.slice(6).map((id) => cardMap[id])}
             </motion.div>
           </SortableContext>
         </DndContext>

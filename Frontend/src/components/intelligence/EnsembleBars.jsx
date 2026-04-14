@@ -77,16 +77,25 @@ export default function EnsembleBars({ overview, insight, insightLoading, fricti
   const ragDocs = overview?.rag_documents ?? 0
   const trainedAt = overview?.trained_at ?? null
 
-  // Derive component weights from real model metrics
-  const lstmPct = auc > 0 ? (auc * 100) : 0
-  // Markov signal: proportional to how many states were discovered, scaled by AUC
-  const markovPct = markovStates > 0 && auc > 0
-    ? Math.min(100, (markovStates / Math.max(ngramVocab, 1)) * auc * 120)
+  // Derive component weights independently from real model/dataset metrics
+  // BiLSTM: show AUC directly, or session-coverage proxy if no AUC yet
+  const lstmPct = auc > 0
+    ? auc * 100
+    : nSessions > 0
+      ? Math.min(100, Math.log10(Math.max(nSessions, 1)) * 25) // log-scaled session coverage
+      : 0
+
+  // Markov: state coverage — how many unique states vs expected
+  // More states = richer journey model (cap at reasonable max ~20 states)
+  const markovPct = markovStates > 0
+    ? Math.min(100, (markovStates / 20) * 100)
     : 0
-  // N-gram signal: perplexity complement — captures anomaly detection strength
-  const ngramPct = ngramVocab > 0 && auc > 0
-    ? Math.min(100, (1 - auc) * 78 + auc * 55)
+
+  // N-gram: vocabulary diversity — higher vocab = better anomaly detection coverage
+  const ngramPct = ngramVocab > 0
+    ? Math.min(100, (ngramVocab / 20) * 100)
     : 0
+
 
   const bars = [
     {

@@ -11,6 +11,7 @@ import ConfidenceBadge from '../components/features/ConfidenceBadge.jsx'
 import FeatureSummaryStats from '../components/features/FeatureSummaryStats.jsx'
 import FeatureTree from '../components/features/FeatureTree.jsx'
 import { getFeatures } from '../api/features.api.js'
+import { fetchRecommendations } from '../services/recommendationService.js'
 
 function buildTree(features) {
   const domains = new Map()
@@ -41,6 +42,48 @@ function buildTree(features) {
   return [...domains.values()]
 }
 
+function mergeFeatureSources(detectedFeatures, recommendations) {
+  const merged = new Map()
+
+  detectedFeatures.forEach((feature, index) => {
+    const key = String(feature.l3_feature || feature.name || `feature-${index}`).toLowerCase()
+    merged.set(key, {
+      ...feature,
+      source_kind: 'detected',
+    })
+  })
+
+  recommendations.forEach((recommendation, index) => {
+    const featureName = recommendation.feature || recommendation.feature_name || recommendation.title
+    if (!featureName) return
+
+    const key = String(featureName).toLowerCase()
+    const existing = merged.get(key)
+
+    if (existing) {
+      merged.set(key, {
+        ...existing,
+        recommendation: recommendation,
+      })
+      return
+    }
+
+    merged.set(key, {
+      id: recommendation.id || `recommendation-feature-${index}`,
+      name: featureName,
+      l1_domain: 'Recommendations',
+      l2_module: recommendation.category || 'Recommended actions',
+      l3_feature: featureName,
+      source_type: 'recommendation',
+      confidence: recommendation.churn_score || recommendation.impact_score / 100 || 0.72,
+      recommendation,
+      source_kind: 'recommendation',
+    })
+  })
+
+  return [...merged.values()]
+}
+
 export default function FeatureDetectionPage() {
   const { tenantId } = useParams()
   const navigate = useNavigate()
@@ -55,13 +98,30 @@ export default function FeatureDetectionPage() {
   useEffect(() => {
     if (!tenantId) return
     setLoading(true)
-    getFeatures(tenantId)
-      .then((response) => {
-        const features = response.features || []
-        setData(features)
-        setExpandedNodes(buildTree(features).map((node) => node.id))
+    setError('')
+    Promise.allSettled([
+      getFeatures(tenantId),
+      fetchRecommendations(tenantId),
+    ])
+      .then(([featuresResult, recommendationsResult]) => {
+        const features =
+          featuresResult.status === 'fulfilled' ? (featuresResult.value.features || []) : []
+        const recommendations =
+          recommendationsResult.status === 'fulfilled' ? (recommendationsResult.value || []) : []
+        const mergedFeatures = mergeFeatureSources(features, recommendations)
+
+        setData(mergedFeatures)
+        setExpandedNodes(buildTree(mergedFeatures).map((node) => node.id))
+
+        if (!mergedFeatures.length) {
+          const featureError =
+            featuresResult.status === 'rejected' ? featuresResult.reason?.message : ''
+          const recommendationError =
+            recommendationsResult.status === 'rejected' ? recommendationsResult.reason?.message : ''
+          setError(featureError || recommendationError || 'Could not load feature data.')
+        }
       })
-      .catch((loadError) => setError(loadError.message || 'Could not load detected features.'))
+      .catch((loadError) => setError(loadError.message || 'Could not load feature data.'))
       .finally(() => setLoading(false))
   }, [tenantId])
 
@@ -104,7 +164,7 @@ export default function FeatureDetectionPage() {
         <EmptyState
           icon={Boxes}
           title="No features detected yet"
-          description="Upload an APK, website URL, or dataset to populate the feature graph."
+          description="Upload an APK, website URL, or dataset to populate the feature graph and recommendation-linked feature list."
           action={{ label: 'Back to upload', onClick: () => navigate('/app/upload') }}
         />
       ) : (
@@ -192,6 +252,8 @@ export default function FeatureDetectionPage() {
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {[
                     { label: 'Source', value: selectedFeature.source_type },
+                    { label: 'Source kind', value: selectedFeature.source_kind },
+                    { label: 'Recommendation category', value: selectedFeature.recommendation?.category },
                     { label: 'Action', value: selectedFeature.l4_action },
                     { label: 'Node', value: selectedFeature.l5_deployment_node },
                     { label: 'Upload ID', value: selectedFeature.upload_id },
@@ -219,6 +281,18 @@ export default function FeatureDetectionPage() {
                           {ev.type}{ev.value ? ` — ${ev.value}` : ''}
                         </span>
                       ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedFeature.recommendation && (
+                  <div className="space-y-3 rounded-3xl border border-cyan-400/15 bg-cyan-500/5 p-4">
+                    <div className="text-xs uppercase tracking-widest text-cyan-300">Recommendation context</div>
+                    <div className="text-sm text-slate-200">
+                      {selectedFeature.recommendation.problem}
+                    </div>
+                    <div className="text-sm text-slate-400">
+                      {selectedFeature.recommendation.suggestion}
                     </div>
                   </div>
                 )}

@@ -1,5 +1,7 @@
 import client from './client.js'
 
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+
 export async function fetchEvents(tenantId, { page = 1, limit = 50, search = '', feature = '', deploymentType = '', success = '' } = {}) {
   const params = new URLSearchParams({ page, limit })
   if (search)         params.set('search', search)
@@ -11,5 +13,5 @@ export async function fetchEvents(tenantId, { page = 1, limit = 50, search = '',
 }
 
 export function getExportCsvUrl(tenantId) {
-  return `/api/export/${tenantId}/csv?type=events`
+  return `${apiBaseUrl}/export/${tenantId}/csv?type=events`
 }

@@ -10,6 +10,19 @@ const {
 } = require('../services/ml/predictionIntegrationService');
 const { postWithRetry } = require('../services/mlService');
 const rootConfig = require('../../config');
+const Tenant = require('../database/models/Tenant');
+const { generateAndStoreRecommendationCards } = require('../services/analytics/recommendationEngineService');
+
+async function finalizeTraining(tenantId) {
+  if (!tenantId) return;
+
+  await Tenant.updateOne(
+    { tenant_key: String(tenantId) },
+    { $set: { ml_trained: true, trained_at: new Date() } }
+  ).catch(() => null);
+
+  await generateAndStoreRecommendationCards(String(tenantId), { refresh: 'true' }).catch(() => null);
+}
 
 async function analyze(req, res) {
   const result = await analyzeTenantSessions({
@@ -77,6 +90,7 @@ async function train(req, res) {
     return res.status(400).json({ error: 'tenant_id is required.' });
   }
   const result = await postWithRetry('/train', { tenant_id, augment }, { timeout: 180000, retries: 0 });
+  await finalizeTraining(tenant_id);
   return res.status(200).json({ success: true, data: result });
 }
 
@@ -117,12 +131,34 @@ async function trainStream(req, res) {
       },
     },
     (mlRes) => {
+      let streamBuffer = '';
+      let finalized = false;
+
+      async function maybeFinalizeFromChunk(chunk) {
+        streamBuffer += chunk.toString('utf8');
+        const frames = streamBuffer.split('\n\n');
+        streamBuffer = frames.pop() || '';
+
+        for (const frame of frames) {
+          if (finalized || !frame.includes('event: result')) continue;
+          finalized = true;
+          await finalizeTraining(tenant_id);
+          break;
+        }
+      }
+
       mlRes.on('data', (chunk) => {
+        maybeFinalizeFromChunk(chunk).catch(() => null);
         res.write(chunk);
         // flush if the response object supports it (compression middleware)
         if (typeof res.flush === 'function') res.flush();
       });
-      mlRes.on('end', () => res.end());
+      mlRes.on('end', async () => {
+        if (!finalized) {
+          await finalizeTraining(tenant_id).catch(() => null);
+        }
+        res.end();
+      });
       mlRes.on('error', (err) => {
         res.write(`event: error\ndata: ${JSON.stringify({ detail: err.message })}\n\n`);
         res.end();

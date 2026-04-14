@@ -1,7 +1,9 @@
 import { useState, useRef, useCallback } from 'react'
 
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+
 /**
- * Streams training progress from POST /api/ml/train/stream
+ * Streams training progress from POST /api/train/stream
  * The ML service emits SSE events: epoch_end, complete, error
  */
 export function useTrainStream() {
@@ -20,7 +22,7 @@ export function useTrainStream() {
     abortRef.current = new AbortController()
 
     try {
-      const res = await fetch('/api/ml/train/stream', {
+      const res = await fetch(`${apiBaseUrl}/train/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenant_id: tenantId, augment }),

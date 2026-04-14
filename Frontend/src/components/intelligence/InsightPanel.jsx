@@ -1,5 +1,4 @@
-import { AlertTriangle, Brain, CheckCircle, Lightbulb, TrendingDown, Zap } from 'lucide-react'
-import { useState } from 'react'
+import { AlertTriangle, Brain, Lightbulb, TrendingDown, Zap } from 'lucide-react'
 
 function generateInsight(friction, featureUsage, churnDist, overview) {
   // Derive the top friction point
@@ -79,8 +78,6 @@ function generateInsight(friction, featureUsage, churnDist, overview) {
 }
 
 export default function InsightPanel({ overview, friction, featureUsage, churnDist, insight, insightLoading }) {
-  const [expanded, setExpanded] = useState(true)
-
   const derived = generateInsight(friction, featureUsage, churnDist, overview)
   const hasData = derived.topFeature || derived.churnPct
 
@@ -199,7 +196,7 @@ export default function InsightPanel({ overview, friction, featureUsage, churnDi
                 </div>
               ) : (
                 <p className="text-[12px] leading-relaxed text-slate-400 italic">
-                  "{insight}"
+                  &quot;{insight}&quot;
                 </p>
               )}
             </div>

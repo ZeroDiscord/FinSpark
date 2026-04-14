@@ -48,9 +48,9 @@ async function dismiss(req, res) {
   const AuditLog = require('../database/models/AuditLog');
   AuditLog.create({
     tenant_id: tenant.id,
-    actor_id:  req.user.sub,
-    action:    'recommendation_dismissed',
-    resource:  req.params.id,
+    actor_id: req.user.sub,
+    action: 'recommendation_dismissed',
+    resource: req.params.id,
   }).catch(() => null);
   return res.json({ success });
 }
@@ -60,15 +60,16 @@ async function sendToAsana(req, res) {
   const task = await sendRecommendationToAsana(
     tenant.id,
     req.params.id,
-    req.body.project_id
+    req.body.project_id,
+    req.body.section_id
   );
   const AuditLog = require('../database/models/AuditLog');
   AuditLog.create({
     tenant_id: tenant.id,
-    actor_id:  req.user.sub,
-    action:    'recommendation_sent_to_asana',
-    resource:  req.params.id,
-    after:     { project_id: req.body.project_id },
+    actor_id: req.user.sub,
+    action: 'recommendation_sent_to_asana',
+    resource: req.params.id,
+    after: { project_id: req.body.project_id },
   }).catch(() => null);
   return res.json(task);
 }

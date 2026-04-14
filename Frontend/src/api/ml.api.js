@@ -1,12 +1,12 @@
 import client from './client.js'
 
 export async function trainModel(tenantId, augment = false) {
-  const res = await client.post('/ml/train', { tenant_id: tenantId, augment })
+  const res = await client.post('/train', { tenant_id: tenantId, augment })
   return res.data
 }
 
 /**
- * Returns an EventSource that streams /ml/train/stream SSE events.
+ * Returns a marker object for the fetch-based /train/stream flow.
  * The caller must close it when done.
  * @param {string} tenantId
  * @param {boolean} augment
@@ -19,6 +19,6 @@ export function trainModelStream(tenantId, augment = false) {
 }
 
 export async function predictSessions(tenantId) {
-  const res = await client.post('/ml/analyze', { tenant_id: tenantId })
+  const res = await client.post('/analyze', { tenant_id: tenantId })
   return res.data
 }

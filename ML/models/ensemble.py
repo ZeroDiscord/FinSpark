@@ -239,9 +239,13 @@ class PredictionEnsemble:
 
             scores_arr = np.array(list(active_scores.values()))
             std_dev = float(np.std(scores_arr))
-            # Confidence: high when models agree (low σ) and we have many models
+            # Confidence is lower when models disagree or the observed journey is very short.
             model_coverage = len(active_scores) / max(len(self.weights), 1)
-            confidence = round(float(np.clip((1.0 - std_dev) * model_coverage, 0.0, 1.0)), 4)
+            sequence_factor = min(max(len(session_sequence), 1) / 3.0, 1.0)
+            confidence = round(
+                float(np.clip((1.0 - std_dev) * model_coverage * sequence_factor, 0.0, 1.0)),
+                4,
+            )
 
         # ── Dominant signal ───────────────────────────────────────────
         implicit_score = np.mean([active_scores.get("markov", 0.5),

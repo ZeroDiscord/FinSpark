@@ -1,7 +1,9 @@
 import axios from 'axios'
 
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+
 const client = axios.create({
-  baseURL: '/api',
+  baseURL: apiBaseUrl,
   timeout: 300_000,
 })
 
@@ -27,7 +29,7 @@ client.interceptors.response.use(
       if (!refreshing) {
         const refreshToken = localStorage.getItem('fs_refresh')
         refreshing = axios
-          .post('/api/auth/refresh', { refresh_token: refreshToken })
+          .post(`${apiBaseUrl}/auth/refresh`, { refresh_token: refreshToken })
           .then((r) => {
             localStorage.setItem('fs_token', r.data.token)
             return r.data.token

@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   Boxes,
   BrainCircuit,
   Cog,
@@ -14,6 +13,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { useTenantContext } from '../../context/TenantContext.jsx'
 import AppSidebar, { resolveTenantPath } from './AppSidebar.jsx'
 import TopNavbar from './TopNavbar.jsx'
+import OnboardingTour from '../ui/OnboardingTour.jsx'
 
 const pageMeta = {
   '/app/workspaces': 'Workspaces',
@@ -54,6 +54,7 @@ export default function AppShell() {
 
   return (
     <div className="page-shell flex min-h-screen">
+      <OnboardingTour />
       <AppSidebar />
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <TopNavbar title={getTitle(location.pathname)} items={resolvedItems} />

@@ -52,7 +52,7 @@ function MetricPill({ icon: Icon, label, value, trend }) {
 
 export default function ExecutiveSummaryPage() {
   const { tenantId } = useParams()
-  const { overview, featureUsage, churn, funnel, isLoading } = useDashboardData(tenantId, {})
+  const { overview, churn, funnel, isLoading } = useDashboardData(tenantId, {})
   const [licenseData, setLicenseData] = useState(null)
   const [recommendations, setRecommendations] = useState([])
 
@@ -79,7 +79,6 @@ export default function ExecutiveSummaryPage() {
 
   // Renewal risk: avg churn rate across churned sessions
   const churnRate = overview?.churn_rate ?? 0
-  const renewalRisk = churnRate > 0.5 ? 'High' : churnRate > 0.25 ? 'Medium' : 'Low'
   const renewalRiskLevel = churnRate > 0.5 ? 'critical' : churnRate > 0.25 ? 'high' : 'low'
 
   return (

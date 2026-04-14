@@ -12,6 +12,8 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+
 const STEPS = [
   { key: 'markov',   label: 'Fitting Markov chain',   icon: GitBranch },
   { key: 'lstm',     label: 'Training LSTM encoder',  icon: Brain },
@@ -113,7 +115,7 @@ export default function TrainModelPanel({ tenantId, eventsIngested, autoStart = 
 
     try {
       const token = localStorage.getItem('fs_token')
-      const res = await fetch('/api/train/stream', {
+      const res = await fetch(`${apiBaseUrl}/train/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

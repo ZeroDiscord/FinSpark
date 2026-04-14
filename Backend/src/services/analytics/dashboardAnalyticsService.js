@@ -6,6 +6,7 @@ const {
   MlPrediction,
   Recommendation,
 } = require('../../database/models');
+const { buildSessionSummary } = require('../ml/sessionAggregationService');
 
 const DEFAULT_FUNNEL_STEPS = ['Apply Loan', 'Upload Documents', 'Credit Check', 'Approval'];
 const STRATEGIC_FEATURES = new Set(['Upload Documents', 'Credit Check', 'Loan Approval', 'EMI Calculator']);
@@ -69,6 +70,78 @@ function normalizeStepList(steps) {
       .filter(Boolean);
   }
   return DEFAULT_FUNNEL_STEPS;
+}
+
+function deriveDynamicFunnelSteps(sessions, maxSteps = null) {
+  const stats = new Map();
+
+  for (const session of sessions || []) {
+    const seen = new Set();
+    (session.feature_sequence || []).forEach((feature, index) => {
+      if (!feature || seen.has(feature)) return;
+      seen.add(feature);
+      if (!stats.has(feature)) {
+        stats.set(feature, { feature, sessions: 0, first_index_sum: 0 });
+      }
+      const row = stats.get(feature);
+      row.sessions += 1;
+      row.first_index_sum += index;
+    });
+  }
+
+  return [...stats.values()]
+    .map((row) => ({
+      feature: row.feature,
+      sessions: row.sessions,
+      avg_index: row.sessions ? row.first_index_sum / row.sessions : Number.MAX_SAFE_INTEGER,
+    }))
+    .sort((a, b) => a.avg_index - b.avg_index || b.sessions - a.sessions)
+    .slice(0, maxSteps || undefined)
+    .map((row) => row.feature);
+}
+
+function deriveDominantPathFunnelSteps(sessions, maxSteps = null) {
+  const startCounts = new Map();
+  const transitionCounts = new Map();
+
+  for (const session of sessions || []) {
+    const sequence = [...new Set((session.feature_sequence || []).filter(Boolean))];
+    if (!sequence.length) continue;
+
+    startCounts.set(sequence[0], (startCounts.get(sequence[0]) || 0) + 1);
+
+    for (let index = 0; index < sequence.length - 1; index += 1) {
+      const source = sequence[index];
+      const target = sequence[index + 1];
+      if (!transitionCounts.has(source)) transitionCounts.set(source, new Map());
+      const targets = transitionCounts.get(source);
+      targets.set(target, (targets.get(target) || 0) + 1);
+    }
+  }
+
+  const firstStep = [...startCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))[0]?.[0];
+
+  if (!firstStep) return deriveDynamicFunnelSteps(sessions, maxSteps);
+
+  const steps = [firstStep];
+  const seen = new Set(steps);
+  const maxAllowedSteps = maxSteps || transitionCounts.size + 1;
+
+  while (steps.length < maxAllowedSteps) {
+    const current = steps[steps.length - 1];
+    const nextCandidates = [...(transitionCounts.get(current)?.entries() || [])]
+      .filter(([feature]) => !seen.has(feature))
+      .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])));
+
+    const nextStep = nextCandidates[0]?.[0];
+    if (!nextStep) break;
+
+    steps.push(nextStep);
+    seen.add(nextStep);
+  }
+
+  return steps;
 }
 
 function buildEventFilter({ tenantId, start, end, channel, deploymentType, feature }) {
@@ -138,6 +211,34 @@ function buildSessionEventMap(events) {
   return map;
 }
 
+function buildDerivedSessionsFromEvents(events) {
+  const sessionEventMap = buildSessionEventMap(events);
+  const summaries = [];
+
+  for (const sessionEvents of sessionEventMap.values()) {
+    if (!sessionEvents?.length) continue;
+    summaries.push(buildSessionSummary(sessionEvents));
+  }
+
+  return summaries.sort((a, b) => new Date(a.session_start || 0) - new Date(b.session_start || 0));
+}
+
+function getEffectiveSessions(sessions, events) {
+  const derivedSessions = buildDerivedSessionsFromEvents(events);
+  const storedSessionMap = new Map((sessions || []).map((session) => [session.session_id, session]));
+  const merged = derivedSessions.map((derived) => ({
+    ...(storedSessionMap.get(derived.session_id) || {}),
+    ...derived,
+  }));
+
+  const derivedIds = new Set(derivedSessions.map((session) => session.session_id));
+  for (const session of sessions || []) {
+    if (!derivedIds.has(session.session_id)) merged.push(session);
+  }
+
+  return merged.sort((a, b) => new Date(a.session_start || 0) - new Date(b.session_start || 0));
+}
+
 function getFeatureUsageBreakdown(events, scopedSessionCount) {
   const featureMap = new Map();
   const tenantMap = new Map();
@@ -204,7 +305,8 @@ function getFeatureUsageBreakdown(events, scopedSessionCount) {
 }
 
 function computeKpis({ events, sessions, latestPredictions }) {
-  const sessionIds = new Set(events.map((item) => item.session_id));
+  const effectiveSessions = getEffectiveSessions(sessions, events);
+  const sessionIds = new Set(effectiveSessions.map((item) => item.session_id).filter(Boolean));
   const userIds = new Set(events.map((item) => item.user_id).filter(Boolean));
   const featureCounts = new Map();
   for (const event of events) {
@@ -213,13 +315,13 @@ function computeKpis({ events, sessions, latestPredictions }) {
   }
 
   const featureRows = [...featureCounts.entries()].sort((a, b) => b[1] - a[1]);
-  const sessionMap = new Map(sessions.map((session) => [session.session_id, session]));
+  const sessionMap = new Map(effectiveSessions.map((session) => [session.session_id, session]));
   const churnedSessions = [...sessionIds].filter((sessionId) =>
     isSessionChurned(sessionMap.get(sessionId), latestPredictions.get(sessionId))
   ).length;
 
-  const avgSessionDuration = sessions.length
-    ? Math.round(sessions.reduce((sum, item) => sum + Number(item.session_length_ms || 0), 0) / sessions.length)
+  const avgSessionDuration = effectiveSessions.length
+    ? Math.round(effectiveSessions.reduce((sum, item) => sum + Number(item.session_length_ms || 0), 0) / effectiveSessions.length)
     : 0;
 
   return {
@@ -234,7 +336,8 @@ function computeKpis({ events, sessions, latestPredictions }) {
 }
 
 function computeFeatureUsage({ events, sessions, groupBy }) {
-  const scopedSessionCount = new Set(sessions.map((session) => session.session_id)).size || 1;
+  const effectiveSessions = getEffectiveSessions(sessions, events);
+  const scopedSessionCount = new Set(effectiveSessions.map((session) => session.session_id)).size || 1;
   const breakdown = getFeatureUsageBreakdown(events, scopedSessionCount);
 
   if (groupBy === 'tenant') return breakdown.tenant_totals;
@@ -243,6 +346,7 @@ function computeFeatureUsage({ events, sessions, groupBy }) {
 }
 
 function computeChurnAnalytics({ events, sessions, latestPredictions }) {
+  const effectiveSessions = getEffectiveSessions(sessions, events);
   const sessionEventMap = buildSessionEventMap(events);
   const featureMap = new Map();
   const moduleMap = new Map();
@@ -250,7 +354,7 @@ function computeChurnAnalytics({ events, sessions, latestPredictions }) {
   const channelMap = new Map();
   const dropOffMap = new Map();
 
-  for (const session of sessions) {
+  for (const session of effectiveSessions) {
     const prediction = latestPredictions.get(session.session_id);
     const churned = isSessionChurned(session, prediction);
     const features = new Set(session.feature_sequence || []);
@@ -348,6 +452,50 @@ function computeChurnAnalytics({ events, sessions, latestPredictions }) {
   };
 }
 
+function computeChurnDistribution({ sessions, latestPredictions }) {
+  const effectiveSessions = sessions || [];
+  const rows = effectiveSessions
+    .map((session) => ({
+      probability: Number(latestPredictions.get(session.session_id)?.churn_probability || 0),
+      isChurn: isSessionChurned(session, latestPredictions.get(session.session_id)),
+    }))
+    .filter((row) => Number.isFinite(row.probability))
+    .map((row) => ({
+      ...row,
+      probability: Math.max(0, Math.min(1, row.probability)),
+    }));
+
+  const totalSessions = rows.length;
+  if (!totalSessions) {
+    return {
+      bins: [],
+      complete_counts: [],
+      churn_counts: [],
+      total_sessions: 0,
+      churn_rate: 0,
+    };
+  }
+
+  const churnRate = round(rows.filter((row) => row.isChurn).length / totalSessions);
+  const nBins = Math.max(6, Math.min(24, Math.ceil(Math.sqrt(totalSessions))));
+  const completeCounts = Array.from({ length: nBins }, () => 0);
+  const churnCounts = Array.from({ length: nBins }, () => 0);
+
+  rows.forEach((row) => {
+    const index = Math.min(Math.floor(row.probability * nBins), nBins - 1);
+    if (row.isChurn) churnCounts[index] += 1;
+    else completeCounts[index] += 1;
+  });
+
+  return {
+    bins: Array.from({ length: nBins }, (_, index) => round(index / nBins, 3)),
+    complete_counts: completeCounts,
+    churn_counts: churnCounts,
+    total_sessions: totalSessions,
+    churn_rate: churnRate,
+  };
+}
+
 function sessionReachedOrderedSteps(sequence, steps) {
   let pointer = 0;
   for (const feature of sequence || []) {
@@ -358,40 +506,57 @@ function sessionReachedOrderedSteps(sequence, steps) {
 }
 
 function computeFunnel({ sessions, steps }) {
-  const orderedSteps = normalizeStepList(steps);
+  const orderedSessions = sessions || [];
+  const orderedSteps =
+    (Array.isArray(steps) && steps.length) || (typeof steps === 'string' && steps.trim())
+      ? normalizeStepList(steps)
+      : deriveDynamicFunnelSteps(orderedSessions);
   const counts = orderedSteps.map(() => new Set());
 
-  for (const session of sessions) {
+  for (const session of orderedSessions) {
     const identity = getSessionIdentity(session);
-    const reached = sessionReachedOrderedSteps(session.feature_sequence || [], orderedSteps);
-    for (let index = 0; index < reached; index += 1) {
-      counts[index].add(identity);
-    }
+    const features = new Set((session.feature_sequence || []).filter(Boolean));
+    orderedSteps.forEach((step, index) => {
+      if (features.has(step)) {
+        counts[index].add(identity);
+      }
+    });
   }
 
-  const firstCount = counts[0]?.size || 0;
   const rows = orderedSteps.map((step, index) => {
     const users = counts[index]?.size || 0;
     const prevUsers = index === 0 ? users : counts[index - 1]?.size || 0;
     return {
       step,
       users,
-      conversion_percentage: firstCount ? round((users / firstCount) * 100, 2) : 0,
-      drop_off_percentage: index === 0 || !prevUsers ? 0 : round(((prevUsers - users) / prevUsers) * 100, 2),
+      conversion_percentage: index === 0 || !prevUsers ? 100 : round((users / prevUsers) * 100, 2),
+      drop_off_percentage: index === 0 || !prevUsers ? 0 : round(Math.max(0, ((prevUsers - users) / prevUsers) * 100), 2),
     };
-  });
+  }).filter((row) => row.users > 0);
 
-  const biggestDrop = rows.slice(1).sort((a, b) => b.drop_off_percentage - a.drop_off_percentage)[0] || null;
+  const firstCount = rows[0]?.users || 0;
+  const normalizedRows = rows.map((row, index) => ({
+    ...row,
+    conversion_percentage:
+      index === 0
+        ? 100
+        : firstCount
+          ? round((row.users / firstCount) * 100, 2)
+          : 0,
+  }));
+
+  const biggestDrop = normalizedRows.slice(1).sort((a, b) => b.drop_off_percentage - a.drop_off_percentage)[0] || null;
   return {
-    steps: rows,
+    steps: normalizedRows,
     biggest_drop_off_step: biggestDrop?.step || null,
   };
 }
 
 function computeJourneys({ sessions, latestPredictions, limit }) {
+  const orderedSessions = sessions || [];
   const pathMap = new Map();
 
-  for (const session of sessions) {
+  for (const session of orderedSessions) {
     const prediction = latestPredictions.get(session.session_id);
     const pathArray = [...(session.feature_sequence || [])];
     if (isSessionChurned(session, prediction)) pathArray.push('CHURN');
@@ -433,6 +598,7 @@ function computeJourneys({ sessions, latestPredictions, limit }) {
 }
 
 function computeTimeInsights({ events, sessions, latestPredictions }) {
+  const effectiveSessions = getEffectiveSessions(sessions, events);
   const daily = new Map();
   const weekly = new Map();
   const monthlyUsage = new Map();
@@ -462,7 +628,7 @@ function computeTimeInsights({ events, sessions, latestPredictions }) {
     monthlyTotals.get(monthKey).add(event.session_id);
   }
 
-  for (const session of sessions) {
+  for (const session of effectiveSessions) {
     const startedAt = new Date(session.session_start || session.createdAt || Date.now());
     const weekKey = getIsoWeekKey(startedAt);
     if (!weekly.has(weekKey)) weekly.set(weekKey, { week: weekKey, sessions: 0, churned: 0 });
@@ -491,6 +657,42 @@ function computeTimeInsights({ events, sessions, latestPredictions }) {
       .map(([hour, event_count]) => ({ hour, event_count }))
       .sort((a, b) => a.hour - b.hour),
   };
+}
+
+function computeJourneyGraph({ sessions, latestPredictions }) {
+  const edgeCounts = new Map();
+  const sourceTotals = new Map();
+
+  for (const session of sessions || []) {
+    const prediction = latestPredictions.get(session.session_id);
+    const sequence = [...(session.feature_sequence || [])].filter(Boolean);
+    if (!sequence.length) continue;
+
+    if (isSessionChurned(session, prediction) && sequence[sequence.length - 1] !== 'drop_off') {
+      sequence.push('drop_off');
+    }
+
+    for (let index = 0; index < sequence.length - 1; index += 1) {
+      const source = sequence[index];
+      const target = sequence[index + 1];
+      const key = `${source}__${target}`;
+      edgeCounts.set(key, (edgeCounts.get(key) || 0) + 1);
+      sourceTotals.set(source, (sourceTotals.get(source) || 0) + 1);
+    }
+  }
+
+  return [...edgeCounts.entries()]
+    .map(([key, count]) => {
+      const [source, target] = key.split('__');
+      const total = sourceTotals.get(source) || 1;
+      return {
+        source,
+        target,
+        count,
+        probability: round(count / total, 4),
+      };
+    })
+    .sort((a, b) => b.count - a.count || b.probability - a.probability);
 }
 
 function computeBenchmarks({ featureUsage, journeys, events, sessions }) {
@@ -588,31 +790,37 @@ async function computeTenantComparison({ ownerId, feature, start, end, channel, 
 
 async function getDashboardAnalytics(input) {
   const data = await loadAnalyticsData(input);
+  const effectiveSessions = getEffectiveSessions(data.sessions, data.events);
   const latestPredictions = getLatestPredictionMap(data.predictions);
-  const kpis = computeKpis({ ...data, latestPredictions });
-  const featureUsage = computeFeatureUsage({ ...data, groupBy: input.groupBy });
-  const churn = computeChurnAnalytics({ ...data, latestPredictions });
-  const funnel = computeFunnel({ sessions: data.sessions, steps: input.steps });
-  const journeys = computeJourneys({ sessions: data.sessions, latestPredictions, limit: Number(input.limit || 10) });
-  const timeInsights = computeTimeInsights({ events: data.events, sessions: data.sessions, latestPredictions });
+  const analyticsInput = { ...data, sessions: effectiveSessions, latestPredictions };
+  const kpis = computeKpis(analyticsInput);
+  const featureUsage = computeFeatureUsage({ ...analyticsInput, groupBy: input.groupBy });
+  const churn = computeChurnAnalytics(analyticsInput);
+  const churnDistribution = computeChurnDistribution(analyticsInput);
+  const funnel = computeFunnel({ sessions: effectiveSessions, steps: input.steps });
+  const journeys = computeJourneys({ sessions: effectiveSessions, latestPredictions, limit: Number(input.limit || 10) });
+  const timeInsights = computeTimeInsights({ events: data.events, sessions: effectiveSessions, latestPredictions });
+  const journeyGraph = computeJourneyGraph({ sessions: effectiveSessions, latestPredictions });
   const benchmarks = computeBenchmarks({
-    featureUsage: computeFeatureUsage({ ...data, groupBy: 'feature' }),
+    featureUsage: computeFeatureUsage({ ...analyticsInput, groupBy: 'feature' }),
     journeys,
     events: data.events,
-    sessions: data.sessions,
+    sessions: effectiveSessions,
   });
 
   return {
     kpis,
     feature_usage: featureUsage,
     churn,
+    churn_distribution: churnDistribution,
     funnel,
     journeys,
     time_insights: timeInsights,
+    journey_graph: journeyGraph,
     recommendations: data.recommendations,
     benchmarks,
     latest_predictions: latestPredictions,
-    scoped_sessions: data.sessions,
+    scoped_sessions: effectiveSessions,
     scoped_events: data.events,
   };
 }
@@ -627,9 +835,11 @@ module.exports = {
   computeKpis,
   computeFeatureUsage,
   computeChurnAnalytics,
+  computeChurnDistribution,
   computeFunnel,
   computeJourneys,
   computeTimeInsights,
+  computeJourneyGraph,
   computeBenchmarks,
   computeTenantComparison,
   getDashboardAnalytics,

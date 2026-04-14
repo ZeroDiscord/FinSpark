@@ -84,7 +84,7 @@ export default function DatasetPage() {
       })
       setRows(data.data?.events || data.events || [])
       setTotal(data.data?.total ?? data.total ?? 0)
-    } catch (e) {
+    } catch {
       setError('Failed to load events. Check that the backend is running.')
     } finally {
       setLoading(false)

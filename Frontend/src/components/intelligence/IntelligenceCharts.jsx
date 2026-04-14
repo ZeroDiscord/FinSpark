@@ -9,9 +9,9 @@
  *   aggregates real transition probabilities into named pipeline stages
  *   fields: source, target, probability
  *
- * DailyTrendChart         → derived from churnDist.churn_rate (real)
- *   no dedicated time-series endpoint — shows conversion rate stability
- *   note rendered so user knows it is indicative, not time-series
+ * DailyTrendChart         → /dashboard/time-insights (weekly churn from dataset)
+ *   uses real weekly churn values from the current tenant dataset
+ *   converts weekly churn into weekly conversion for the chart
  *
  * FeatureCriticalityPolarChart → /dashboard/:tenantId/feature-usage
  *   real P(churn | feature) per feature from conditional probability
@@ -62,6 +62,112 @@ function NoData({ label = 'No data available' }) {
       {label}
     </div>
   )
+}
+
+function normalizeUsageRows(featureUsage) {
+  if (Array.isArray(featureUsage)) return featureUsage
+  if (Array.isArray(featureUsage?.rows)) return featureUsage.rows
+  return []
+}
+
+function normalizeFunnelEdges(payload) {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.edges)) return payload.edges
+  if (Array.isArray(payload?.rows)) return payload.rows
+  return []
+}
+
+function deriveDynamicFunnelSteps(funnelEdges, featureUsage) {
+  const terminalStates = new Set(['drop_off', 'session_end', 'exit', 'disbursement'])
+  const usageRows = normalizeUsageRows(featureUsage)
+  const edgeRows = normalizeFunnelEdges(funnelEdges).filter(
+    (edge) => edge?.source && edge?.target && Number(edge.probability || 0) > 0
+  )
+
+  const usageMap = new Map(usageRows.map((row) => [row.feature, Number(row.usage_count || 0)]))
+  const nodeScores = new Map()
+  const incoming = new Map()
+  const outgoing = new Map()
+
+  function ensureNode(node) {
+    if (!node) return
+    if (!incoming.has(node)) incoming.set(node, new Set())
+    if (!outgoing.has(node)) outgoing.set(node, new Set())
+    if (!nodeScores.has(node)) nodeScores.set(node, usageMap.get(node) || 0)
+  }
+
+  edgeRows.forEach((edge) => {
+    const countish = Math.max(
+      Number(edge.count || 0),
+      Math.round(Number(edge.probability || 0) * 1000)
+    )
+    ensureNode(edge.source)
+    ensureNode(edge.target)
+    incoming.get(edge.target).add(edge.source)
+    outgoing.get(edge.source).add(edge.target)
+    nodeScores.set(edge.source, Math.max(nodeScores.get(edge.source) || 0, countish, usageMap.get(edge.source) || 0))
+    nodeScores.set(edge.target, Math.max(nodeScores.get(edge.target) || 0, countish, usageMap.get(edge.target) || 0))
+  })
+
+  usageRows.forEach((row) => ensureNode(row.feature))
+
+  const nonTerminalNodes = [...nodeScores.keys()].filter(
+    (node) => !terminalStates.has(node) && (nodeScores.get(node) || 0) > 0
+  )
+  if (!nonTerminalNodes.length) return []
+
+  const indegree = new Map(
+    nonTerminalNodes.map((node) => [
+      node,
+      [...(incoming.get(node) || [])].filter((parent) => !terminalStates.has(parent)).length,
+    ])
+  )
+
+  const queue = nonTerminalNodes
+    .filter((node) => (indegree.get(node) || 0) === 0)
+    .sort((a, b) => (nodeScores.get(b) || 0) - (nodeScores.get(a) || 0) || a.localeCompare(b))
+
+  const ordered = []
+  const visited = new Set()
+
+  while (queue.length) {
+    const node = queue.shift()
+    if (!node || visited.has(node)) continue
+    visited.add(node)
+    ordered.push(node)
+
+    ;[...(outgoing.get(node) || [])]
+      .filter((child) => indegree.has(child))
+      .forEach((child) => {
+        indegree.set(child, Math.max(0, (indegree.get(child) || 0) - 1))
+        if ((indegree.get(child) || 0) === 0) {
+          queue.push(child)
+          queue.sort((a, b) => (nodeScores.get(b) || 0) - (nodeScores.get(a) || 0) || a.localeCompare(b))
+        }
+      })
+  }
+
+  const orderedNodes = [
+    ...ordered,
+    ...nonTerminalNodes
+      .filter((node) => !visited.has(node))
+      .sort((a, b) => (nodeScores.get(b) || 0) - (nodeScores.get(a) || 0) || a.localeCompare(b)),
+  ]
+
+  return orderedNodes
+    .map((node, index) => {
+      const users = Math.max(0, Math.round(nodeScores.get(node) || 0))
+      const prevUsers = index === 0
+        ? users
+        : Math.max(1, Math.round(nodeScores.get(orderedNodes[index - 1]) || 0))
+      return {
+        step: node,
+        users,
+        conversion_percentage: index === 0 ? 100 : Number(((users / prevUsers) * 100).toFixed(2)),
+        drop_off_percentage: index === 0 ? 0 : Number((Math.max(0, ((prevUsers - users) / prevUsers) * 100)).toFixed(2)),
+      }
+    })
+    .filter((row) => row.users > 0)
 }
 
 // ─── Churn Probability Distribution (BiLSTM) ─────────────────────────────────
@@ -138,58 +244,42 @@ export function ChurnDistributionChart({ churnDist }) {
   )
 }
 
-// ─── Conversion Funnel (Markov Transitions) ───────────────────────────────────
-// Source: /dashboard/:tenantId/funnel
-// Real Markov chain edges: { source, target, probability }
-// Groups known features into lending pipeline stages and sums in-edge probabilities
-// as a proxy for relative stage volume (normalized to session count).
-const STAGE_FEATURES = {
-  'Login': ['login', 'app_open', 'session_start'],
-  'Document Upload': ['doc_upload', 'document', 'upload', 'file'],
-  'KYC / Bureau': ['kyc_check', 'kyc', 'bureau_pull', 'bureau', 'identity'],
-  'Decisioning': ['credit_scoring', 'income_verification', 'manual_review', 'scoring', 'underwriting'],
-  'Disbursement': ['disbursement', 'loan_accept', 'disburse', 'payout'],
-}
+// ─── Conversion Funnel ────────────────────────────────────────────────────────
+// Primary source: /dashboard/funnel (backend-derived steps from actual dataset)
+//   { steps: [{ step, users, conversion_percentage, drop_off_percentage }],
+//     biggest_drop_off_step }
+// Fallback: derive from funnelEdges / featureUsage when funnel prop is absent.
 
-function deriveFunnelFromEdges(funnelEdges, featureUsage) {
-  // Prefer usage_count from featureUsage if available (more accurate than edge prob)
-  if (featureUsage?.length) {
-    return Object.entries(STAGE_FEATURES).map(([stage, keywords]) => {
-      const matched = featureUsage.filter((u) =>
-        keywords.some((k) => (u.feature || '').toLowerCase().includes(k))
-      )
-      const count = matched.reduce((s, u) => s + (u.usage_count || 0), 0)
-      return { stage, count }
-    })
-  }
-  // Fallback: sum transition probabilities into stages from Markov edges
-  if (funnelEdges?.length) {
-    return Object.entries(STAGE_FEATURES).map(([stage, keywords]) => {
-      const prob = funnelEdges
-        .filter((e) => keywords.some((k) => (e.target || '').toLowerCase().includes(k)))
-        .reduce((s, e) => s + (e.probability || 0), 0)
-      return { stage, count: Math.round(prob * 10000) }
-    })
-  }
-  return []
-}
+export function ConversionFunnelChart({ funnel, funnelEdges, featureUsage }) {
+  // ── Try the backend funnel data first (actual dataset-driven) ───────────────
+  const backendSteps = (Array.isArray(funnel?.steps) ? funnel.steps : Array.isArray(funnel?.rows) ? funnel.rows : [])
+    .map((step) => ({
+      step: step?.step || step?.label || step?.feature || 'Unknown Step',
+      users: Number(step?.users ?? step?.count ?? step?.sessions ?? 0),
+      conversion_percentage: Number(step?.conversion_percentage ?? step?.conversion ?? 0),
+      drop_off_percentage: Number(step?.drop_off_percentage ?? step?.dropoff_percentage ?? 0),
+    }))
+    .filter((s) => s.users > 0)
 
-export function ConversionFunnelChart({ funnelEdges, featureUsage }) {
-  const stages = deriveFunnelFromEdges(funnelEdges, featureUsage).filter((s) => s.count > 0)
 
-  if (!stages.length) return <NoData label="Awaiting Markov model data…" />
+  // ── Fallback: derive from featureUsage / funnelEdges (legacy) ───────────────
+  const resolvedSteps = backendSteps.length
+    ? backendSteps
+    : deriveDynamicFunnelSteps(funnelEdges, featureUsage)
 
-  // Sort descending so it reads as a funnel
-  const sorted = [...stages].sort((a, b) => b.count - a.count)
-  const maxCount = sorted[0].count
+  if (!resolvedSteps.length) return <NoData label="No funnel data available" />
+
+  const maxCount = Math.max(...resolvedSteps.map((step) => step.users), 1)
 
   const data = {
-    labels: sorted.map((s) => s.stage),
+    labels: resolvedSteps.map((step) => step.step.replace(/_/g, ' ')),
     datasets: [
       {
         label: 'Sessions',
-        data: sorted.map((s) => s.count),
-        backgroundColor: sorted.map((_, i) => `rgba(16,185,129,${0.85 - i * 0.15})`),
+        data: resolvedSteps.map((step) => step.users),
+        backgroundColor: resolvedSteps.map((_, i) =>
+          `rgba(16,185,129,${Math.max(0.25, 0.9 - i * (0.65 / Math.max(resolvedSteps.length - 1, 1)))})`
+        ),
         borderColor: '#10b981',
         borderWidth: 1,
         borderRadius: 4,
@@ -218,17 +308,28 @@ export function ConversionFunnelChart({ funnelEdges, featureUsage }) {
       tooltip: {
         callbacks: {
           label: (item) => {
-            const pct = maxCount > 0 ? ((item.raw / maxCount) * 100).toFixed(1) : '—'
-            return `${item.raw.toLocaleString()} sessions (${pct}% of top stage)`
+            const step = resolvedSteps[item.dataIndex]
+            return [
+              `${item.raw.toLocaleString()} sessions`,
+              `Conversion: ${(step.conversion_percentage || 0).toFixed(1)}%`,
+              step.drop_off_percentage > 0 ? `Drop-off: ${step.drop_off_percentage.toFixed(1)}%` : null,
+            ].filter(Boolean)
           },
+          afterBody: () =>
+            funnel?.biggest_drop_off_step
+              ? [`Biggest drop-off: ${String(funnel.biggest_drop_off_step).replace(/_/g, ' ')}`]
+              : [],
         },
       },
     },
   }
 
   return (
-    <div style={{ height: Math.max(180, stages.length * 44), position: 'relative' }}>
+    <div style={{ height: Math.max(180, resolvedSteps.length * 44), position: 'relative' }}>
       <Bar data={data} options={options} />
+      <p className="absolute bottom-0 right-0 text-right font-mono text-[8px] uppercase tracking-widest text-slate-600">
+        dataset-derived funnel · {resolvedSteps.length} steps
+      </p>
     </div>
   )
 }
@@ -237,25 +338,18 @@ export function ConversionFunnelChart({ funnelEdges, featureUsage }) {
 // No time-series endpoint exists. We use the real overall churn_rate from the
 // LSTM churn-distribution response and show conversion = 1 - churn_rate as a
 // reference line with a note. NOT mock data — just stable baseline.
-export function DailyTrendChart({ churnDist, overview }) {
-  // Use real churn_rate from churnDist (more accurate than overview which is 0.0)
-  const churnRate = churnDist?.churn_rate ?? overview?.churn_rate ?? null
-  const totalSessions = churnDist?.total_sessions ?? overview?.n_sessions ?? 0
+export function DailyTrendChart({ timeInsights }) {
+  // Use real weekly churn data from the tenant dataset.
+  const weekly = [...(timeInsights?.weekly_churn || [])]
+    .filter((row) => row?.week)
+    .sort((a, b) => String(a.week).localeCompare(String(b.week)))
 
-  const convRate = churnRate !== null ? 1 - churnRate : null
+  if (!weekly.length) return <NoData label="Awaiting time-series dataset signals..." />
 
-  // Show 7-day stability window. No per-day breakdown in API, so show reference + band.
-  // Use n_sessions to seed small variance so values don't change on re-render.
-  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-  const baseData = convRate !== null
-    ? labels.map((_, i) => {
-        // Deterministic small variance from totalSessions seed
-        const variance = (((totalSessions * (i + 7)) % 13) - 6) / 200
-        return Math.max(0, Math.min(1, convRate + variance))
-      })
-    : null
-
-  if (!baseData) return <NoData label="Awaiting churn distribution data…" />
+  const labels = weekly.map((row) => row.week)
+  const baseData = weekly.map((row) => Math.max(0, Math.min(1, 1 - Number(row.churn_rate || 0))))
+  const averageConversion =
+    baseData.reduce((sum, value) => sum + value, 0) / Math.max(baseData.length, 1)
 
   const data = {
     labels,
@@ -274,8 +368,8 @@ export function DailyTrendChart({ churnDist, overview }) {
       },
       {
         // Reference line at actual churn_rate-based conversion
-        label: 'Baseline',
-        data: labels.map(() => convRate),
+        label: 'Dataset Average',
+        data: labels.map(() => averageConversion),
         borderColor: 'rgba(100,116,139,0.4)',
         borderDash: [4, 4],
         borderWidth: 1,
@@ -291,8 +385,8 @@ export function DailyTrendChart({ churnDist, overview }) {
     scales: {
       x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#64748b' } },
       y: {
-        min: Math.max(0, (convRate ?? 0.5) - 0.2),
-        max: Math.min(1, (convRate ?? 0.5) + 0.2),
+        min: Math.max(0, Math.min(...baseData) - 0.1),
+        max: Math.min(1, Math.max(...baseData) + 0.1),
         grid: { color: 'rgba(51,65,85,0.3)' },
         border: { display: false },
         ticks: {
@@ -307,9 +401,9 @@ export function DailyTrendChart({ churnDist, overview }) {
       tooltip: {
         callbacks: {
           label: (item) => `Conversion: ${(item.raw * 100).toFixed(1)}%`,
-          afterBody: () => [
-            `Baseline (1 − churn rate): ${(convRate * 100).toFixed(1)}%`,
-            `Model churn rate: ${((churnRate ?? 0) * 100).toFixed(1)}%`,
+          afterBody: (items) => [
+            `Weekly churn: ${((1 - items[0].raw) * 100).toFixed(1)}%`,
+            `Dataset average conversion: ${(averageConversion * 100).toFixed(1)}%`,
           ],
         },
       },
@@ -320,7 +414,7 @@ export function DailyTrendChart({ churnDist, overview }) {
     <div className="relative" style={{ height: 220 }}>
       <Line data={data} options={options} />
       <p className="absolute bottom-0 right-0 text-right font-mono text-[8px] uppercase tracking-widest text-slate-600">
-        Indicative — no per-day API · churn rate = {((churnRate ?? 0) * 100).toFixed(1)}%
+        Dataset-driven weekly trend · {weekly.length} periods
       </p>
     </div>
   )
@@ -401,9 +495,12 @@ export function SessionOutcomeChart({ sessions, churnDist }) {
 export function FeatureCriticalityPolarChart({ featureUsage }) {
   const EXCLUDE = new Set(['drop_off', 'session_end', 'exit', 'error'])
   const top6 = [...(featureUsage || [])]
-    .filter((u) => !EXCLUDE.has(u.feature) && u.churn_rate > 0)
-    .sort((a, b) => b.churn_rate - a.churn_rate)
-    .slice(0, 6)
+    .filter((u) => !EXCLUDE.has(u.feature) && Number(u.usage_count || 0) > 0)
+    .sort((a, b) =>
+      Number(b.churn_rate || 0) - Number(a.churn_rate || 0) ||
+      Number(b.usage_count || 0) - Number(a.usage_count || 0) ||
+      String(a.feature || '').localeCompare(String(b.feature || ''))
+    )
 
   if (!top6.length) return <NoData label="Awaiting feature usage data…" />
 

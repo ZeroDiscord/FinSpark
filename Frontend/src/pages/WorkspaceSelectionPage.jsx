@@ -50,7 +50,7 @@ export default function WorkspaceSelectionPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" id="tour-workspace-selection">
       <Modal
         open={modalOpen}
         onOpenChange={(open) => { setModalOpen(open); if (!open) { setForm(EMPTY_FORM); setFormError('') } }}

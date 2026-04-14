@@ -72,8 +72,6 @@ export default function UploadPage() {
   const {
     activeTab,
     setActiveTab,
-    uploadProgress,
-    setUploadProgress,
     previewRows,
     setPreviewRows,
     validationErrors,

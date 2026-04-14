@@ -29,6 +29,23 @@ from torch.optim import Adam
 from torch.utils.data import DataLoader, Dataset, random_split
 
 
+def _safe_torch_save(obj, path: str) -> None:
+    """Persist torch artifacts through a Python file handle for Windows safety."""
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    with open(path, "wb") as handle:
+        torch.save(obj, handle)
+
+
+def _safe_torch_load(path: str, map_location=None, weights_only: bool | None = None):
+    """Load torch artifacts through a Python file handle to mirror safe saves."""
+    with open(path, "rb") as handle:
+        if weights_only is None:
+            return torch.load(handle, map_location=map_location)
+        return torch.load(handle, map_location=map_location, weights_only=weights_only)
+
+
 # ===========================================================================
 # LSTMChurnEncoder
 # ===========================================================================
@@ -305,6 +322,12 @@ class LSTMTrainer:
             History dict with keys ``"train_loss"``, ``"val_loss"``, ``"val_auc"``.
             Each value is a list of per-epoch floats.
         """
+        random.seed(42)
+        np.random.seed(42)
+        torch.manual_seed(42)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(42)
+
         self._vocab = dataset.vocab
 
         if val_dataset is not None:
@@ -373,7 +396,7 @@ class LSTMTrainer:
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 epochs_without_improvement = 0
-                torch.save(self.model.state_dict(), checkpoint_path)
+                _safe_torch_save(self.model.state_dict(), checkpoint_path)
             else:
                 epochs_without_improvement += 1
                 if epochs_without_improvement >= patience:
@@ -383,7 +406,9 @@ class LSTMTrainer:
 
         # Restore best weights
         if os.path.exists(checkpoint_path):
-            self.model.load_state_dict(torch.load(checkpoint_path, map_location=self.device, weights_only=True))
+            self.model.load_state_dict(
+                _safe_torch_load(checkpoint_path, map_location=self.device, weights_only=True)
+            )
 
         return history
 
@@ -483,7 +508,7 @@ class LSTMTrainer:
             path: Base output path (e.g. ``"models/lstm_trainer"``).
                   Generates ``<path>.pt`` and ``<path>.vocab.pkl``.
         """
-        torch.save(self.model.state_dict(), f"{path}.pt")
+        _safe_torch_save(self.model.state_dict(), f"{path}.pt")
         with open(f"{path}.vocab.pkl", "wb") as f:
             pickle.dump(self._vocab, f)
 
@@ -495,7 +520,7 @@ class LSTMTrainer:
             path: Base path used during :meth:`save`.
         """
         self.model.load_state_dict(
-            torch.load(f"{path}.pt", map_location=self.device)
+            _safe_torch_load(f"{path}.pt", map_location=self.device)
         )
         with open(f"{path}.vocab.pkl", "rb") as f:
             self._vocab = pickle.load(f)

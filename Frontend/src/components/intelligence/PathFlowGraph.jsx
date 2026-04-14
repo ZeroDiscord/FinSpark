@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Maximize2, Minimize2, Search, ZoomIn, ZoomOut } from 'lucide-react'
 
 // ─── Inline SVG icon paths ────────────────────────────────────────────────────
 const ICON_PATHS = {
@@ -92,8 +93,8 @@ function getIcon(node) {
 //  2. Per-layer vertical sort — order nodes to minimise crossings
 //  3. Vertical spread        — push nodes apart within a column to avoid overlap
 
-function buildGraphData(funnelEdges, friction, W) {
-  if (!funnelEdges?.length || W < 10) return null
+function buildGraphData(funnelEdges, friction, containerW) {
+  if (!funnelEdges?.length || containerW < 10) return null
 
   const NODE_R    = 26
   const PAD_X     = NODE_R + 40          // horizontal margin
@@ -107,8 +108,18 @@ function buildGraphData(funnelEdges, friction, W) {
       .map((f) => f.feature)
   )
 
-  // Filter edges — keep meaningful transitions
-  const edges = funnelEdges.filter((e) => e.probability > 0.06)
+  // Keep all real transitions from the dataset, but limit visual noise per source.
+  const groupedEdges = new Map()
+  funnelEdges.forEach((edge) => {
+    if (!edge?.source || !edge?.target || (edge.probability || 0) <= 0) return
+    if (!groupedEdges.has(edge.source)) groupedEdges.set(edge.source, [])
+    groupedEdges.get(edge.source).push(edge)
+  })
+  const edges = [...groupedEdges.values()].flatMap((rows) =>
+    rows
+      .sort((a, b) => (b.count || 0) - (a.count || 0) || (b.probability || 0) - (a.probability || 0))
+      .slice(0, 6)
+  )
 
   // Collect nodes
   const nodeSet = new Set()
@@ -163,8 +174,10 @@ function buildGraphData(funnelEdges, friction, W) {
   const numCols = sortedLayerNums.length
 
   // ── 3. Calculate column x positions
+  // Compute actual width needed — guarantee MIN_COL_W between columns
+  const W = Math.max(containerW, PAD_X * 2 + (numCols - 1) * MIN_COL_W)
   const usableW   = W - PAD_X * 2
-  const colSpacing = Math.max(MIN_COL_W, numCols > 1 ? usableW / (numCols - 1) : usableW)
+  const colSpacing = numCols > 1 ? usableW / (numCols - 1) : usableW
 
   const colX = {}
   sortedLayerNums.forEach((l, i) => { colX[l] = PAD_X + i * colSpacing })
@@ -230,8 +243,10 @@ function edgePath(src, dst, r) {
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function PathFlowGraph({ funnelEdges, featureUsage, friction }) {
   const containerRef = useRef(null)
-  const [width, setWidth]       = useState(0)
+  const [width, setWidth] = useState(0)
   const [hoveredNode, setHoveredNode] = useState(null)
+  const [zoom, setZoom] = useState(1)
+  const [isCompact, setIsCompact] = useState(false)
 
   useEffect(() => {
     const el = containerRef.current
@@ -251,6 +266,26 @@ export default function PathFlowGraph({ funnelEdges, featureUsage, friction }) {
     [funnelEdges, friction, width]
   )
 
+  const viewportHeight = useMemo(() => {
+    if (!graph) return 420
+    if (isCompact) return Math.max(320, Math.min(420, Math.round(width * 0.42)))
+    return Math.max(420, Math.min(760, Math.round(width * 0.58)))
+  }, [graph, isCompact, width])
+  const canvasWidth = graph ? Math.max(graph.W * zoom, width) : width
+  const canvasHeight = graph ? Math.max(graph.H * zoom, viewportHeight) : viewportHeight
+
+  function handleZoomIn() {
+    setZoom((current) => Math.min(3, Number((current + 0.25).toFixed(2))))
+  }
+
+  function handleZoomOut() {
+    setZoom((current) => Math.max(1, Number((current - 0.25).toFixed(2))))
+  }
+
+  function handleFit() {
+    setZoom(1)
+  }
+
   if (!funnelEdges?.length) {
     return (
       <div className="flex h-64 items-center justify-center text-xs font-mono text-slate-500">
@@ -269,21 +304,72 @@ export default function PathFlowGraph({ funnelEdges, featureUsage, friction }) {
     )
   }
 
-  const { nodePositions, edges, nodes, frictionSet, W, H, NODE_R } = graph
+  const { nodePositions, edges, nodes, frictionSet, NODE_R } = graph
   const ICON_SIZE = 15
 
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-x-auto"
-      style={{ height: H }}
+      className="relative w-full overflow-x-auto overflow-y-auto rounded-2xl border border-white/5 bg-slate-950/35"
+      style={{ height: viewportHeight }}
     >
-      <svg
-        width={Math.max(W, width)}
-        height={H}
-        viewBox={`0 0 ${Math.max(W, width)} ${H}`}
-        style={{ display: 'block' }}
+      <div className="absolute right-3 top-3 z-30 flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-950/85 px-2 py-1.5 backdrop-blur">
+        <button
+          type="button"
+          onClick={handleZoomOut}
+          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
+          aria-label="Zoom out"
+        >
+          <ZoomOut className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={handleFit}
+          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
+          aria-label="Fit graph"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={handleZoomIn}
+          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
+          aria-label="Zoom in"
+        >
+          <ZoomIn className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsCompact((current) => !current)}
+          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
+          aria-label={isCompact ? 'Expand graph height' : 'Collapse graph height'}
+        >
+          {isCompact ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+        </button>
+        <div className="pl-1 font-mono text-[10px] text-slate-500">
+          {Math.round(zoom * 100)}%
+        </div>
+      </div>
+
+      <div
+        style={{
+          width: canvasWidth,
+          height: canvasHeight,
+          minWidth: 'max-content',
+          minHeight: 'max-content',
+        }}
       >
+        <svg
+          width={graph.W}
+          height={graph.H}
+          viewBox={`0 0 ${graph.W} ${graph.H}`}
+          preserveAspectRatio="xMinYMin meet"
+          style={{
+            display: 'block',
+            transform: `scale(${zoom})`,
+            transformOrigin: 'top left',
+          }}
+        >
         {/* ── Defs: arrow markers per edge ── */}
         <defs>
           <marker id="arrow-green" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
@@ -463,7 +549,8 @@ export default function PathFlowGraph({ funnelEdges, featureUsage, friction }) {
             </g>
           )
         })}
-      </svg>
+        </svg>
+      </div>
 
       {/* ── Hover tooltip ── */}
       {hoveredNode && nodePositions[hoveredNode] && (() => {
@@ -471,8 +558,8 @@ export default function PathFlowGraph({ funnelEdges, featureUsage, friction }) {
         const usage = featureUsage?.find((u) => u.feature === hoveredNode)
         const fr    = graph.friction.find((f) => f.feature === hoveredNode)
         // Position tooltip above the node, avoiding right-edge overflow
-        const leftPx = Math.min(pos.x + NODE_R + 10, width - 180)
-        const topPx  = Math.max(pos.y - 60, 4)
+        const leftPx = Math.min((pos.x * zoom) + 36, canvasWidth - 180)
+        const topPx  = Math.max((pos.y * zoom) - 48, 8)
         return (
           <div
             className="pointer-events-none absolute z-20 rounded-xl border border-white/10 bg-slate-950/95 px-3 py-2.5 shadow-2xl backdrop-blur-xl"

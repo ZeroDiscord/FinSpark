@@ -76,7 +76,7 @@ export default function FeatureTable({ featureUsage, friction }) {
       if (typeof av === 'string') return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
       return sortDir === 'asc' ? av - bv : bv - av
     })
-  }, [featureUsage, friction, query, sortKey, sortDir, frictionMap])
+  }, [featureUsage, query, sortKey, sortDir, frictionMap])
 
   function toggleSort(key) {
     if (sortKey === key) {

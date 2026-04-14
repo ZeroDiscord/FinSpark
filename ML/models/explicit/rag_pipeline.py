@@ -9,11 +9,14 @@ Implements a Retrieval-Augmented Generation (RAG) pipeline that:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import uuid
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import pandas as pd
 
 # Lazy-load heavy deps
@@ -34,16 +37,48 @@ def _get_sentence_transformer(model_name: str):
     if _SentenceTransformer is None:
         from sentence_transformers import SentenceTransformer as _ST
         _SentenceTransformer = _ST
-    return _SentenceTransformer(model_name)
+    try:
+        return _SentenceTransformer(model_name, local_files_only=True)
+    except Exception:
+        try:
+            return _SentenceTransformer(model_name)
+        except Exception:
+            return _FallbackEmbedder()
+
+
+class _FallbackEmbedder:
+    """Offline-safe deterministic embedder used when sentence-transformers is unavailable."""
+
+    def __init__(self, dimension: int = 128) -> None:
+        self.dimension = dimension
+
+    def _encode_one(self, text: str) -> np.ndarray:
+        vector = np.zeros(self.dimension, dtype=np.float32)
+        tokens = str(text or "").lower().split()
+        if not tokens:
+            return vector
+
+        for token in tokens:
+            digest = hashlib.sha256(token.encode("utf-8")).digest()
+            bucket = int.from_bytes(digest[:4], "big") % self.dimension
+            sign = 1.0 if digest[4] % 2 == 0 else -1.0
+            weight = 1.0 + (digest[5] / 255.0)
+            vector[bucket] += sign * weight
+
+        norm = np.linalg.norm(vector)
+        return vector if norm == 0 else vector / norm
+
+    def encode(self, texts):
+        if isinstance(texts, str):
+            return self._encode_one(texts)
+        return np.vstack([self._encode_one(text) for text in texts])
 
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-VECTORSTORE_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "data", "vectorstore"
-)
+VECTORSTORE_PATH = str((Path(__file__).resolve().parents[2] / "data" / "vectorstore").resolve())
 DEFAULT_EMBED_MODEL = "all-MiniLM-L6-v2"
 
 
@@ -123,7 +158,7 @@ class FeatureRAGPipeline:
         chroma = _get_chromadb()
 
         # Persist to disk
-        os.makedirs(VECTORSTORE_PATH, exist_ok=True)
+        Path(VECTORSTORE_PATH).mkdir(parents=True, exist_ok=True)
         self.client = chroma.PersistentClient(path=VECTORSTORE_PATH)
 
         self.collection = self.client.get_or_create_collection(

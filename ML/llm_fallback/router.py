@@ -13,10 +13,14 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 import time
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+if __name__ == "ML.llm_fallback.router":
+    sys.modules.setdefault("llm_fallback.router", sys.modules[__name__])
 
 # ---------------------------------------------------------------------------
 # Retry constants

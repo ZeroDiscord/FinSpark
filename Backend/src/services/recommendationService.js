@@ -55,7 +55,7 @@ async function findAsanaConnection(tenantId) {
   return AsanaConnection.findOne({ tenant_id: String(tenantId) });
 }
 
-async function sendRecommendationToAsana(tenantId, recommendationId, projectId) {
+async function sendRecommendationToAsana(tenantId, recommendationId, projectId, sectionId) {
   const recommendation = await findRecommendationById(tenantId, recommendationId);
   if (!recommendation) throw new NotFoundError('Recommendation not found.');
 
@@ -71,7 +71,7 @@ async function sendRecommendationToAsana(tenantId, recommendationId, projectId) 
       metrics: recommendation.metrics || {},
     },
     projectId: projectId || connection.project_gid,
-    sectionId: connection.default_column_gid,
+    sectionId: sectionId || connection.default_column_gid,
   });
 
   await markRecommendationAsana(recommendation._id || recommendation.id, task.task_gid, task.permalink_url);

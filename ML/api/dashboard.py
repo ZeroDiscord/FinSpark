@@ -340,7 +340,8 @@ async def get_churn_distribution(tenant_id: str = Query(...)):
             all_probs.extend(probs.squeeze(1).numpy().tolist())
             all_labels.extend(lbls.numpy().tolist())
 
-    n_bins = 20
+    session_count = max(len(sequences), 1)
+    n_bins = max(6, min(24, int(np.ceil(np.sqrt(session_count)))))
     bin_edges      = np.linspace(0, 1, n_bins + 1)
     complete_counts = [0] * n_bins
     churn_counts    = [0] * n_bins

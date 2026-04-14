@@ -1,7 +1,6 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
-  BarChart3,
   Boxes,
-  Brain,
   Cog,
   Database,
   GitBranchPlus,
@@ -15,15 +14,15 @@ import { NavLink } from 'react-router-dom'
 import { useTenantContext } from '../../context/TenantContext.jsx'
 
 const navItems = [
-  { label: 'Workspaces',      icon: LayoutGrid,    base: '/app/workspaces' },
-  { label: 'Upload',          icon: Upload,         base: '/app/upload' },
-  { label: 'Features',        icon: Boxes,          base: '/app/features' },
-  { label: 'Tracking',        icon: Workflow,       base: '/app/tracking' },
-  { label: 'Dataset',         icon: Database,       base: '/app/dataset' },
-  { label: 'Intelligence',    icon: Network,        base: '/app/intelligence' },
-  { label: 'Recommendations', icon: Sparkles,       base: '/app/recommendations' },
-  { label: 'Asana',           icon: GitBranchPlus,  base: '/app/asana' },
-  { label: 'Settings',        icon: Cog,            base: '/app/settings' },
+  { label: 'Workspaces',      icon: LayoutGrid,    base: '/app/workspaces', id: 'tour-nav-workspaces'},
+  { label: 'Upload',          icon: Upload,        base: '/app/upload', id: 'tour-nav-upload' },
+  { label: 'Features',        icon: Boxes,         base: '/app/features' },
+  { label: 'Tracking',        icon: Workflow,      base: '/app/tracking' },
+  { label: 'Dataset',         icon: Database,      base: '/app/dataset' },
+  { label: 'Intelligence',    icon: Network,       base: '/app/intelligence', id: 'tour-nav-intelligence' },
+  { label: 'Recommendations', icon: Sparkles,      base: '/app/recommendations' },
+  { label: 'Asana',           icon: GitBranchPlus, base: '/app/asana' },
+  { label: 'Settings',        icon: Cog,           base: '/app/settings' },
 ]
 
 export function resolveTenantPath(base, tenantId) {
@@ -62,6 +61,7 @@ export default function AppSidebar() {
         {navItems.map((item) => (
           <NavLink
             key={item.base}
+            id={item.id}
             to={resolveTenantPath(item.base, activeTenant?.id)}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition ${

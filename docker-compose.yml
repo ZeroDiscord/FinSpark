@@ -4,7 +4,7 @@ services:
       context: ./Frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: http://localhost:3001/api
+        VITE_API_BASE_URL: /api
     ports:
       - "5173:80"
     depends_on:
@@ -20,7 +20,7 @@ services:
       PORT: 3001
       FRONTEND_URL: http://localhost:5173
       ML_BASE_URL: http://ml-service:8000
-      MONGO_URI: mongodb://mongodb:27017
+      MONGO_URI: mongodb://mongodb:27017/finspark
       MONGO_DB_NAME: finspark
       KAFKA_BROKERS: kafka:9092
     volumes:

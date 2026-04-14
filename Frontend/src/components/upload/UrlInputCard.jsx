@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Bot, Check, ChevronDown, ChevronUp, Globe, Loader2, Plus, SearchCheck, X } from 'lucide-react'
+import { Bot, Check, Globe, Loader2, Plus, SearchCheck, X } from 'lucide-react'
 import Button from '../ui/Button.jsx'
 import { discoverPaths } from '../../api/upload.api.js'
 
@@ -140,7 +140,7 @@ function ManualPathsPanel({ baseUrl, onBaseUrlChange, paths, onPathsChange, onAn
 }
 
 // ─── Auto crawl mode ──────────────────────────────────────────────────────────
-function AutoCrawlPanel({ onSubmit, loading }) {
+function AutoCrawlPanel({ onSubmit }) {
   const [url, setUrl] = useState('')
   const [maxPages, setMaxPages] = useState('50')
   const [maxDepth, setMaxDepth] = useState('3')
