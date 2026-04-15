@@ -501,6 +501,7 @@ export function FeatureCriticalityPolarChart({ featureUsage }) {
       Number(b.usage_count || 0) - Number(a.usage_count || 0) ||
       String(a.feature || '').localeCompare(String(b.feature || ''))
     )
+    .slice(0, 6)
 
   if (!top6.length) return <NoData label="Awaiting feature usage data…" />
 
@@ -517,10 +518,12 @@ export function FeatureCriticalityPolarChart({ featureUsage }) {
     labels: top6.map((u) => u.feature.replace(/_/g, ' ')),
     datasets: [
       {
-        // Value = churn_rate * 100 (real conditional probability)
-        data: top6.map((u) => Math.round(u.churn_rate * 100)),
+        data: top6.map((u) => Math.max(0.5, Number((Number(u.churn_rate || 0) * 100).toFixed(2)))),
         backgroundColor: top6.map((_, i) => COLORS[i % COLORS.length]),
-        borderWidth: 0,
+        borderColor: top6.map((_, i) => COLORS[i % COLORS.length].replace('0.75)', '1)')),
+        borderWidth: 1,
+        hoverOffset: 6,
+        borderRadius: 4,
       },
     ],
   }
@@ -528,25 +531,20 @@ export function FeatureCriticalityPolarChart({ featureUsage }) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    scales: {
-      r: {
-        grid: { color: 'rgba(51,65,85,0.4)' },
-        ticks: { display: false },
-        pointLabels: { display: false },
-      },
-    },
+    cutout: '70%',
     plugins: {
       legend: {
-        position: 'bottom',
-        labels: { boxWidth: 10, font: { size: 9 }, color: '#94a3b8', padding: 10 },
+        position: 'right',
+        labels: { usePointStyle: true, font: { size: 10 }, color: '#94a3b8', padding: 12 },
       },
       tooltip: {
         callbacks: {
           label: (item) => {
             const u = top6[item.dataIndex]
+            const rate = Number(u?.churn_rate || 0)
             return [
-              ` Churn rate: ${(u.churn_rate * 100).toFixed(1)}%`,
-              ` Usage count: ${u.usage_count}`,
+              ` Churn rate: ${(rate * 100).toFixed(1)}%`,
+              ` Usage count: ${u.usage_count ?? '—'}`,
             ]
           },
         },
@@ -556,7 +554,7 @@ export function FeatureCriticalityPolarChart({ featureUsage }) {
 
   return (
     <div style={{ height: 220, position: 'relative' }}>
-      <PolarArea data={data} options={options} />
+      <Doughnut data={data} options={options} />
     </div>
   )
 }

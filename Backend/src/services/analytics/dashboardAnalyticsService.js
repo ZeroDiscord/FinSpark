@@ -808,9 +808,30 @@ async function getDashboardAnalytics(input) {
     sessions: effectiveSessions,
   });
 
+  // Build churn_rate lookup from churn_by_feature for feature usage enrichment
+  const churnByFeatureMap = new Map(
+    (churn.churn_by_feature || []).map((row) => [row.feature, row])
+  );
+
+  // Total events for usage_pct calculation
+  const totalEvents = (featureUsage || []).reduce((sum, row) => sum + (row.usage_count || 0), 0) || 1;
+
+  // Enrich feature_usage rows with churn_rate and usage_pct
+  const enrichedFeatureUsage = Array.isArray(featureUsage)
+    ? featureUsage.map((row) => {
+        const churnRow = churnByFeatureMap.get(row.feature);
+        return {
+          ...row,
+          usage_pct: round(row.usage_count / totalEvents, 4),
+          churn_rate: churnRow ? churnRow.churn_rate : 0,
+          avg_churn_probability: churnRow ? churnRow.avg_churn_probability : 0,
+        };
+      })
+    : featureUsage;
+
   return {
     kpis,
-    feature_usage: featureUsage,
+    feature_usage: enrichedFeatureUsage,
     churn,
     churn_distribution: churnDistribution,
     funnel,
